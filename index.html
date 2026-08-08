@@ -16,7 +16,7 @@
         
         <div style="margin: 20px 0; padding: 15px; background: rgba(255, 42, 42, 0.05); border: 1px dashed var(--secondary-neon); text-align: center;">
             <p style="font-size: 10px; color: var(--secondary-neon);">DECIFRE (BASE64) PARA 6 NÚMEROS:</p>
-            <h2 id="captcha-display" style="color: var(--secondary-neon); letter-spacing: 5px; margin: 10px 0;"></h2>
+            <canvas id="captcha-canvas" width="280" height="48" style="display:block;margin:10px auto;" aria-hidden="true"></canvas>
             <input type="text" id="captcha-input" placeholder="DIGITE OS 6 NÚMEROS" maxlength="6">
         </div>
 
@@ -37,18 +37,46 @@
             messagingSenderId: "118364909075",
             appId: "1:118364909075:web:e861cc89702144e62d99e6"
         };
-        if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+        try {
+            if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+            var auth = firebase.auth();
+            var db = firebase.firestore();
+        } catch (e) {
+            document.getElementById('auth-msg').innerText = 'Erro de conexão com Firebase. Verifique console e configurações de domínio no Firebase.';
+            console.error('Firebase init error:', e);
+        }
+
+        // Helpful network check
+        function isOnline() { return navigator.onLine; }
     </script>
 
     <script>
         let currentCaptcha = "";
-        
+
+        // Render the base64 captcha into a canvas so it cannot be copied as text
+        const canvas = document.getElementById('captcha-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function renderCaptchaBase64(text) {
+            // clear
+            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg') || '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // draw noisy background
+            for (let i=0;i<30;i++){
+                ctx.fillStyle = 'rgba(255,255,255,' + (Math.random()*0.06+0.02) + ')';
+                ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, Math.random()*6, Math.random()*6);
+            }
+            ctx.font = '18px monospace';
+            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--secondary-neon') || '#0ff';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 10, canvas.height/2);
+        }
+
         function generateCaptcha() {
             const num = Math.floor(100000 + Math.random() * 900000).toString();
             currentCaptcha = num;
-            document.getElementById('captcha-display').innerText = btoa(num); 
+            const b = btoa(num);
+            renderCaptchaBase64(b);
         }
         generateCaptcha();
 
@@ -62,19 +90,35 @@
             return true;
         }
 
+        // Prevent copying/pasting of the captcha
+        canvas.addEventListener('copy', e => e.preventDefault());
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+        const captchaInput = document.getElementById('captcha-input');
+        captchaInput.addEventListener('paste', e => { e.preventDefault(); document.getElementById('auth-msg').innerText = 'Colar não permitido no captcha.'; });
+        // Prevent selecting the canvas
+        canvas.style.userSelect = 'none';
+        canvas.setAttribute('aria-label','Captcha base64 (não selecionável)');
+
         function login() {
             if(!verifyCaptcha()) return;
+            if (!isOnline()) { document.getElementById('auth-msg').innerText = 'Sem conexão de rede.'; return; }
             const e = document.getElementById('email').value;
             const p = document.getElementById('password').value;
             auth.signInWithEmailAndPassword(e, p).then(() => {
                 window.location.href = "dashboard.html";
             }).catch(err => {
-                document.getElementById('auth-msg').innerText = err.message;
+                console.error('Login error', err);
+                if (err && err.code === 'auth/network-request-failed') {
+                    document.getElementById('auth-msg').innerText = 'Erro de conexão com o Firebase. Verifique internet e domínios autorizados no console Firebase.';
+                } else {
+                    document.getElementById('auth-msg').innerText = err.message || 'Erro ao autenticar.';
+                }
             });
         }
 
         function toggleRegister() {
             if(!verifyCaptcha()) return;
+            if (!isOnline()) { document.getElementById('auth-msg').innerText = 'Sem conexão de rede.'; return; }
             const e = document.getElementById('email').value;
             const p = document.getElementById('password').value;
             auth.createUserWithEmailAndPassword(e, p).then((cred) => {
@@ -86,9 +130,17 @@
                     jsonbinId: ""
                 }).then(() => {
                     window.location.href = "dashboard.html";
+                }).catch(err => {
+                    console.error('DB save error', err);
+                    document.getElementById('auth-msg').innerText = 'Conta criada, mas falha ao salvar perfil.';
                 });
             }).catch(err => {
-                document.getElementById('auth-msg').innerText = err.message;
+                console.error('Register error', err);
+                if (err && err.code === 'auth/network-request-failed') {
+                    document.getElementById('auth-msg').innerText = 'Erro de conexão com o Firebase. Verifique internet e domínios autorizados no console Firebase.';
+                } else {
+                    document.getElementById('auth-msg').innerText = err.message || 'Erro ao criar conta.';
+                }
             });
         }
     </script>
