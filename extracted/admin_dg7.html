@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DG7STORE - ADMIN CORE</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div>
+      <p class="eyebrow" style="text-align:center; font-size:10px;">SISTEMA DE CONTROLE</p>
+      <h1>DG7 // ADMIN CORE</h1>
+    </div>
+    <div class="status-pill" id="db-status">CONECTANDO...</div>
+  </div>
+
+  <div class="container" id="auth-check">
+    <h2 id="auth-title">Carregando...</h2>
+    <p id="auth-desc" class="text-center" style="font-size: 12px;">Verificando status de segurança no banco de dados.</p>
+    <input type="password" id="admin-pass" placeholder="Senha" style="display: none;">
+    <button id="auth-btn" onclick="handleAuth()" style="display: none;">Acessar</button>
+  </div>
+
+  <div class="container hidden" id="admin-panel">
+      <h3 style="color:var(--secondary-neon)">Parser e Conversor (Valores)</h3>
+      <p style="font-size: 10px; margin-bottom: 10px;">Cole o texto bruto aqui. O extrator acha os cartões e pede o preço por BIN.</p>
+      <textarea id="raw-text" rows="5" placeholder="Cole qualquer lixo/texto aqui..."></textarea>
+      <button onclick="parseText()">Analisar e Extrair</button>
+      
+      <div id="parsed-results" style="margin-top:10px; font-size:10px; background:#000; padding:10px; border:1px solid #111;"></div>
+      
+      <button class="alt-btn" onclick="uploadToDB()" style="margin-top: 15px;">Subir para Central DB</button>
+      
+      <hr style="border: 1px dashed var(--border-color); margin: 20px 0;">
+
+      <h3>Gerador de Códigos</h3>
+      <div class="flex-row">
+        <input type="number" id="code-value" placeholder="Valor (R$)">
+        <input type="number" id="code-uses" placeholder="Qtd. usos">
+      </div>
+      <button onclick="generateCode()">Gerar Código</button>
+      <div id="generation-status" class="status-pill">Pronto para gerar.</div>
+      <div id="generated-code" style="text-align:center; font-size: 20px; color: var(--primary-neon); margin-top: 10px;">DG7-XXXX-XXXX</div>
+  </div>
+
+  <script>
+    const firebaseConfig = { apiKey: "AIzaSyAt7cAOc3I02wg31EHq39aQigYY_CyxtkY", authDomain: "dg7store-c9636.firebaseapp.com", projectId: "dg7store-c9636", storageBucket: "dg7store-c9636.firebasestorage.app", messagingSenderId: "118364909075", appId: "1:118364909075:web:e861cc89702144e62d99e6" };
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+    const db = firebase.firestore();
+
+    let isSetupMode = false;
+    async function sha256(message) {
+        const msgBuffer = new TextEncoder().encode(message);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    window.onload = async function() {
+        try {
+            const doc = await db.collection('admin_config').doc('security').get();
+            document.getElementById('admin-pass').style.display = 'block';
+            document.getElementById('auth-btn').style.display = 'block';
+            document.getElementById('db-status').innerText = 'ONLINE';
+
+            if (doc.exists && doc.data().masterHash) {
+                isSetupMode = false;
+                document.getElementById('auth-title').innerText = "Senha Admin";
+                document.getElementById('auth-desc').innerText = "Digite a senha mestre.";
+                document.getElementById('auth-btn').innerText = "Acessar Painel";
+            } else {
+                isSetupMode = true;
+                document.getElementById('auth-title').innerText = "Criar Senha";
+                document.getElementById('auth-desc').innerText = "Crie a senha mestre do painel.";
+                document.getElementById('auth-btn').innerText = "Criar e Acessar";
+            }
+        } catch (e) {
+            document.getElementById('db-status').innerText = 'ERRO DE CONEXÃO';
+        }
+    };
+
+    async function handleAuth() {
+        const pass = document.getElementById('admin-pass').value;
+        if (!pass) return alert('Digite a senha.');
+        const hash = await sha256(pass);
+
+        if (isSetupMode) {
+            await db.collection('admin_config').doc('security').set({ masterHash: hash });
+            alert('Senha criada! Acesso liberado.');
+            liberarPainel();
+            isSetupMode = false; 
+            document.getElementById('auth-title').innerText = "Senha Admin";
+            document.getElementById('auth-desc').innerText = "Digite a senha mestre.";
+            document.getElementById('auth-btn').innerText = "Acessar Painel";
+            document.getElementById('admin-pass').value = ''; 
+        } else {
+            const doc = await db.collection('admin_config').doc('security').get();
+            if (doc.data().masterHash === hash) {
+                liberarPainel();
+            } else {
+                alert('Senha Incorreta!');
+            }
+        }
+    }
+
+    function liberarPainel() {
+        document.getElementById('auth-check').classList.add('hidden');
+        document.getElementById('admin-panel').classList.remove('hidden');
+    }
+
+    let parsedItems = [];
+    let uniqueBins = new Set(); 
+
+    function parseText() {
+      const text = document.getElementById('raw-text').value;
+      const regex = /(?:^|\D)((\d[\s-]*){16})[\D]+(\d{2})[\D]+(\d{2}|\d{4})[\D]+(\d{3,4})(?:\D|$)/g;
+      
+      let match;
+      parsedItems = [];
+      uniqueBins.clear();
+      let outputHTML = '<h4 style="color:var(--text-main)">Extratos:</h4><div style="margin-bottom:15px; font-size:10px;">';
+
+      while ((match = regex.exec(text)) !== null) {
+        const num = match[1].replace(/[\s-]/g, ''); 
+        const mes = match[3];
+        const anoStr = match[4];
+        const ano = anoStr.length === 2 ? '20' + anoStr : anoStr;
+        const cvc = match[5];
+        const bin = num.substring(0, 6);
+        
+        uniqueBins.add(bin);
+        parsedItems.push({ numero: num, exp: `${mes}/${ano}`, cvc, bin, status: 'available', owner: null });
+        outputHTML += `${num}|${mes}|${ano}|${cvc} 》 N7 CODIGO DE SEGURANÇA INCORRETO (DG7STORE)<br>`;
+      }
+      
+      outputHTML += '</div>';
+
+      if (parsedItems.length > 0) {
+          outputHTML += '<h4 style="color: var(--secondary-neon); margin-bottom: 10px;">Defina os Preços:</h4>';
+          uniqueBins.forEach(bin => {
+              outputHTML += `<div style="margin-bottom: 8px;">
+                BIN <strong>${bin}</strong>: 
+                <input type="number" id="price-${bin}" placeholder="R$ (Ex: 35.00)" style="width: 100%; padding: 10px; margin-top: 5px;">
+              </div>`;
+          });
+      }
+
+      document.getElementById('parsed-results').innerHTML = outputHTML || 'Nenhum padrão encontrado.';
+    }
+
+    function uploadToDB() {
+      if (parsedItems.length === 0) return alert('Nada para subir.');
+      let binPrices = {};
+      let allPricesValid = true;
+      
+      uniqueBins.forEach(bin => {
+          let priceVal = parseFloat(document.getElementById(`price-${bin}`).value);
+          if (isNaN(priceVal) || priceVal <= 0) { allPricesValid = false; }
+          binPrices[bin] = priceVal;
+      });
+
+      if (!allPricesValid) return alert('ATENÇÃO: Preencha um valor válido (maior que zero) para TODAS as BINs.');
+
+      const batch = db.batch();
+      parsedItems.forEach(item => {
+        const docRef = db.collection('store_db').doc();
+        item.price = binPrices[item.bin];
+        batch.set(docRef, item);
+      });
+
+      batch.commit().then(() => {
+        alert(`${parsedItems.length} itens adicionados!`);
+        parsedItems = [];
+        uniqueBins.clear();
+        document.getElementById('parsed-results').innerHTML = '';
+      }).catch(err => {
+        alert('Falha ao salvar no banco.');
+      });
+    }
+
+    function generateCode() {
+      const val = parseFloat(document.getElementById('code-value').value);
+      const uses = parseInt(document.getElementById('code-uses').value, 10);
+      const statusBox = document.getElementById('generation-status');
+      const outputBox = document.getElementById('generated-code');
+
+      if (!Number.isFinite(val) || val <= 0 || !Number.isInteger(uses) || uses <= 0) {
+        statusBox.innerText = 'Erro: Valor/Qtd inválidos.';
+        return alert('Preencha valor e usos válidos.');
+      }
+
+      const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let code = 'DG7-';
+      for (let i = 0; i < 8; i++) code += charset.charAt(Math.floor(Math.random() * charset.length));
+
+      outputBox.innerText = code;
+      statusBox.innerText = 'Salvando no banco...';
+
+      db.collection('codes').doc(code).set({ value: val, uses, createdAt: firebase.firestore.FieldValue.serverTimestamp() })
+      .then(() => { statusBox.innerText = 'Registrado com sucesso.'; })
+      .catch(err => { statusBox.innerText = 'Falha na sincronização.'; });
+    }
+  </script>
+</body>
+</html>

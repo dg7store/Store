@@ -1,0 +1,195 @@
+
+:root {
+    --bg-color: #030604; /* Deep tactical dark green/black */
+    --panel-bg: rgba(6, 15, 8, 0.85); /* Slightly transparent for grid */
+    --primary-neon: #00ff55; /* Hacker CRT green */
+    --secondary-neon: #ff2a2a; /* Defense Alert Red */
+    --text-main: #9cbda6; /* Muted terminal text */
+    --border-color: #0f3319;
+}
+
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    font-family: 'Courier New', Courier, monospace; /* Hacker aesthetic */
+    text-transform: uppercase; /* Military standard */
+}
+
+body { 
+    background-color: var(--bg-color); 
+    color: var(--text-main); 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    min-height: 100vh; 
+    padding: 10px; /* Reduced for mobile */
+    /* Tactical radar/grid background */
+    background-image:
+        linear-gradient(rgba(0, 255, 85, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 85, 0.04) 1px, transparent 1px);
+    background-size: 25px 25px;
+}
+
+h1, h2, h3 { 
+    color: var(--primary-neon); 
+    text-shadow: 0 0 5px rgba(0,255,85,0.5); 
+    margin-bottom: 15px; 
+    text-align: center; 
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 5px;
+    letter-spacing: 2px;
+}
+
+/* Mobile optimized container */
+.container { 
+    background-color: var(--panel-bg); 
+    padding: 25px 15px 15px 15px; 
+    border: 1px solid var(--border-color);
+    border-top: 4px solid var(--primary-neon); /* Accent top */
+    box-shadow: 0 5px 20px rgba(0,0,0,0.8); 
+    width: 100%; 
+    max-width: 100%; /* Fills Android screen */
+    margin-bottom: 15px; 
+    position: relative;
+}
+
+/* Defense Department flair injected via CSS (No HTML change) */
+.container::before {
+    content: '[US_DEFENSE_NET // SYS_ACTIVE]';
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    background: var(--bg-color);
+    color: var(--primary-neon);
+    font-size: 10px;
+    padding: 0 5px;
+    letter-spacing: 1px;
+}
+
+input, button, textarea { 
+    width: 100%; 
+    padding: 14px; 
+    margin: 8px 0; 
+    border-radius: 0; /* Sharp tactical edges */
+    border: 1px solid var(--border-color); 
+    background: rgba(0, 0, 0, 0.6); 
+    color: var(--primary-neon); 
+    outline: none; 
+    font-size: 16px; /* Prevents auto-zoom on mobile */
+}
+
+textarea { resize: vertical; }
+
+input:focus, textarea:focus { 
+    border-color: var(--primary-neon); 
+    box-shadow: inset 0 0 8px rgba(0, 255, 85, 0.15); 
+}
+
+button { 
+    background: rgba(0, 255, 85, 0.05); 
+    border: 1px solid var(--primary-neon); 
+    font-weight: bold; 
+    cursor: pointer; 
+    transition: 0.1s; 
+    letter-spacing: 1px;
+}
+
+button:active { 
+    background: var(--primary-neon); 
+    color: #000; 
+    box-shadow: 0 0 15px var(--primary-neon); 
+}
+
+.alt-btn {
+    border-color: var(--secondary-neon);
+    color: var(--secondary-neon);
+    background: rgba(255, 42, 42, 0.05);
+}
+.alt-btn:active {
+    background: var(--secondary-neon);
+    color: #000;
+    box-shadow: 0 0 15px var(--secondary-neon); 
+}
+
+.hidden { display: none !important; }
+
+.flex-row { 
+    display: flex; 
+    justify-content: space-between; 
+    gap: 8px; 
+    flex-wrap: wrap; /* Allows wrapping on very small screens */
+}
+.flex-row > * { flex: 1 1 45%; } /* Forces side-by-side or stack */
+
+.text-center { text-align: center; }
+.status-pill { text-align: center; font-size: 12px; color: var(--primary-neon); margin: 5px 0; }
+
+/* Tactical Avatar Box - Octagon shape */
+.avatar-container { 
+    width: 90px; 
+    height: 90px; 
+    border: 2px solid var(--primary-neon); 
+    clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%);
+    margin: 0 auto 15px; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    background: #000; 
+}
+
+/* Night Vision / Matrix effect on user photo */
+.avatar-container img { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+    filter: grayscale(100%) contrast(1.5) sepia(100%) hue-rotate(75deg); 
+}
+
+.saldo-box { 
+    background: #000; 
+    border: 1px solid var(--secondary-neon); 
+    padding: 15px; 
+    text-align: center; 
+    font-size: 24px; 
+    margin-bottom: 20px; 
+    color: var(--secondary-neon);
+    text-shadow: 0 0 8px rgba(255, 42, 42, 0.5); 
+    position: relative;
+}
+.saldo-box::before {
+    content: 'DEF_BUDGET_ALLOCATED';
+    position: absolute; top: 2px; left: 5px; font-size: 8px; color: #555;
+}
+
+/* Responsive Android Visual CC */
+.cc-viewer { 
+    position: relative; 
+    width: 100%; /* Adapts to Android screen */
+    max-width: 360px; 
+    aspect-ratio: 1.6; /* Keeps perfect card shape */
+    background: repeating-linear-gradient(45deg, #070707, #070707 10px, #0e0e0e 10px, #0e0e0e 20px); 
+    border: 1px solid var(--text-main); 
+    margin: 20px auto; 
+    overflow: hidden; 
+    box-shadow: 0 0 15px rgba(0,0,0,0.9); 
+}
+.cc-viewer::before { 
+    content: ''; 
+    position: absolute; top: 15px; left: 15px; 
+    width: 40px; height: 30px; 
+    background: repeating-linear-gradient(90deg, #665522, #665522 2px, #887733 2px, #887733 4px); 
+    border-radius: 4px; 
+}
+/* Percentages for positioning inside responsive container */
+.cc-number { 
+    position: absolute; top: 45%; left: 5%; 
+    font-size: clamp(16px, 5.5vw, 22px); /* Scales font with screen */
+    letter-spacing: 2px; text-shadow: 2px 2px 0px #000; color: #fff; 
+}
+.cc-name { position: absolute; bottom: 10%; left: 5%; font-size: clamp(10px, 4vw, 14px); color: var(--text-main); }
+.cc-exp { position: absolute; bottom: 10%; right: 22%; font-size: clamp(10px, 3.5vw, 12px); color: var(--text-main); }
+.cc-cvc { position: absolute; bottom: 10%; right: 5%; font-size: clamp(10px, 3.5vw, 14px); color: var(--secondary-neon); }
+
+.nav-arrows { display: flex; justify-content: space-between; width: 100%; max-width: 360px; margin: 0 auto; gap: 10px; }
+.nav-arrows button { width: 100%; margin: 0; padding: 12px; font-size: 12px; }

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DG7STORE - Auth</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+</head>
+<body>
+    <div class="container" id="login-box">
+        <h1>DG7STORE</h1>
+        <p class="text-center" style="font-size:12px;">ACESSO RESTRITO</p>
+        
+        <div style="margin: 20px 0; padding: 15px; background: rgba(255, 42, 42, 0.05); border: 1px dashed var(--secondary-neon); text-align: center;">
+            <p style="font-size: 10px; color: var(--secondary-neon);">DECIFRE (BASE64) PARA 6 NÚMEROS:</p>
+            <h2 id="captcha-display" style="color: var(--secondary-neon); letter-spacing: 5px; margin: 10px 0;"></h2>
+            <input type="text" id="captcha-input" placeholder="DIGITE OS 6 NÚMEROS" maxlength="6">
+        </div>
+
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Senha">
+        <button onclick="login()">Entrar</button>
+        <button class="alt-btn" onclick="toggleRegister()">Criar Conta</button>
+        <p id="auth-msg" style="color: var(--secondary-neon); text-align: center; margin-top: 10px; font-size:12px;"></p>
+    </div>
+
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAt7cAOc3I02wg31EHq39aQigYY_CyxtkY",
+            authDomain: "dg7store-c9636.firebaseapp.com",
+            projectId: "dg7store-c9636",
+            storageBucket: "dg7store-c9636.firebasestorage.app",
+            messagingSenderId: "118364909075",
+            appId: "1:118364909075:web:e861cc89702144e62d99e6"
+        };
+        if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+    </script>
+
+    <script>
+        let currentCaptcha = "";
+        
+        function generateCaptcha() {
+            const num = Math.floor(100000 + Math.random() * 900000).toString();
+            currentCaptcha = num;
+            document.getElementById('captcha-display').innerText = btoa(num); 
+        }
+        generateCaptcha();
+
+        function verifyCaptcha() {
+            const input = document.getElementById('captcha-input').value;
+            if(input !== currentCaptcha) {
+                document.getElementById('auth-msg').innerText = "Falha na verificação de segurança.";
+                generateCaptcha();
+                return false;
+            }
+            return true;
+        }
+
+        function login() {
+            if(!verifyCaptcha()) return;
+            const e = document.getElementById('email').value;
+            const p = document.getElementById('password').value;
+            auth.signInWithEmailAndPassword(e, p).then(() => {
+                window.location.href = "dashboard.html";
+            }).catch(err => {
+                document.getElementById('auth-msg').innerText = err.message;
+            });
+        }
+
+        function toggleRegister() {
+            if(!verifyCaptcha()) return;
+            const e = document.getElementById('email').value;
+            const p = document.getElementById('password').value;
+            auth.createUserWithEmailAndPassword(e, p).then((cred) => {
+                db.collection('users').doc(cred.user.uid).set({
+                    email: e,
+                    saldo: 0.00,
+                    avatarUrl: "",
+                    jsonbinKey: "",
+                    jsonbinId: ""
+                }).then(() => {
+                    window.location.href = "dashboard.html";
+                });
+            }).catch(err => {
+                document.getElementById('auth-msg').innerText = err.message;
+            });
+        }
+    </script>
+</body>
+</html>

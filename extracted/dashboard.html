@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DG7STORE - Painel</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="flex-row">
+            <h2 style="margin:0;">DG7STORE</h2>
+            <button onclick="logout()" style="width: auto; padding: 10px 15px; margin:0;">Sair</button>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <div class="avatar-container">
+                <img id="profile-img" src="https://via.placeholder.com/100?text=DG" alt="Perfil">
+            </div>
+            <div class="saldo-box">R$ <span id="saldo-display">0.00</span></div>
+        </div>
+
+        <h3>Resgatar Código</h3>
+        <div class="flex-row">
+            <input type="text" id="resgate-code" placeholder="Insira o código">
+            <button class="alt-btn" onclick="resgatar()" style="flex: 1 1 100%;">Resgatar</button>
+        </div>
+        
+        <hr style="border: 1px dashed var(--border-color); margin: 20px 0;">
+
+        <h3>Configurações de Perfil</h3>
+        <input type="text" id="avatar-url" placeholder="URL da Foto de Perfil">
+        <input type="text" id="jsonbin-id" placeholder="JSONBin ID">
+        <input type="password" id="jsonbin-key" placeholder="JSONBin Key (Auth)">
+        <button onclick="salvarPerfil()">Salvar Configurações</button>
+
+        <hr style="border: 1px dashed var(--border-color); margin: 20px 0;">
+
+        <h3>Store - Busca BIN</h3>
+        <div class="flex-row">
+            <input type="text" id="bin-search" placeholder="Primeiros 6 dígitos" maxlength="6">
+            <button onclick="buscarBin()" style="flex: 1 1 100%;">Buscar</button>
+        </div>
+        <p id="bin-result" style="text-align: center; margin-top: 10px; color: var(--primary-neon); font-size:12px;"></p>
+        <button id="btn-comprar" class="hidden alt-btn" onclick="comprar()">Confirmar Compra</button>
+
+        <hr style="border: 1px dashed var(--border-color); margin: 20px 0;">
+
+        <h3>Meu Histórico</h3>
+        <div class="cc-viewer">
+            <div class="cc-number" id="v-num">**** **** **** ****</div>
+            <div class="cc-name" id="v-name">NOME ALEATORIO</div>
+            <div class="cc-exp" id="v-exp">**/**</div>
+            <div class="cc-cvc" id="v-cvc">***</div>
+        </div>
+        <div class="nav-arrows">
+            <button onclick="navHistory(-1)">◄ Voltar</button>
+            <button onclick="navHistory(1)">Avançar ►</button>
+        </div>
+        <p id="history-count" class="text-center" style="margin-top: 10px; font-size:12px;">0 / 0</p>
+    </div>
+
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAt7cAOc3I02wg31EHq39aQigYY_CyxtkY",
+            authDomain: "dg7store-c9636.firebaseapp.com",
+            projectId: "dg7store-c9636",
+            storageBucket: "dg7store-c9636.firebasestorage.app",
+            messagingSenderId: "118364909075",
+            appId: "1:118364909075:web:e861cc89702144e62d99e6"
+        };
+        if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+    </script>
+
+    <script>
+        let currentUser = null;
+        let currentSaldo = 0; 
+        let historyData = [];
+        let currentHistoryIdx = 0;
+        const nomesAleatorios = ["CARLOS ALBERTO SILVA", "FERNANDA M SOUZA", "ROBERTO C LIMA", "JULIANA P COSTA", "MARCOS V OLIVEIRA"];
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                loadProfile();
+                loadHistory();
+            } else {
+                window.location.href = "index.html";
+            }
+        });
+
+        function loadProfile() {
+            db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
+                const data = doc.data();
+                currentSaldo = data.saldo;
+                document.getElementById('saldo-display').innerText = data.saldo.toFixed(2);
+                if(data.avatarUrl) document.getElementById('profile-img').src = data.avatarUrl;
+                document.getElementById('avatar-url').value = data.avatarUrl || "";
+                document.getElementById('jsonbin-id').value = data.jsonbinId || "";
+                document.getElementById('jsonbin-key').value = data.jsonbinKey || "";
+            });
+        }
+
+        function salvarPerfil() {
+            db.collection('users').doc(currentUser.uid).update({
+                avatarUrl: document.getElementById('avatar-url').value,
+                jsonbinId: document.getElementById('jsonbin-id').value,
+                jsonbinKey: document.getElementById('jsonbin-key').value
+            }).then(() => alert("Perfil salvo!"));
+        }
+
+        function resgatar() {
+            const code = document.getElementById('resgate-code').value;
+            db.collection('codes').doc(code).get().then(doc => {
+                if(doc.exists && doc.data().uses > 0) {
+                    const val = doc.data().value;
+                    db.collection('codes').doc(code).update({ uses: firebase.firestore.FieldValue.increment(-1) });
+                    db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(val) });
+                    alert(`Resgatado: R$ ${val}`);
+                } else {
+                    alert("Código inválido/esgotado!");
+                }
+            });
+        }
+
+        let currentBinQuery = "";
+        let currentBinPrice = 0;
+
+        function buscarBin() {
+            const bin = document.getElementById('bin-search').value;
+            db.collection('store_db').where('bin', '==', bin).where('status', '==', 'available').get().then(snap => {
+                if(snap.empty) {
+                    document.getElementById('bin-result').innerText = "Estoque: 0";
+                    document.getElementById('btn-comprar').classList.add('hidden');
+                } else {
+                    currentBinPrice = snap.docs[0].data().price || 35.00;
+                    document.getElementById('bin-result').innerText = `Estoque: ${snap.size} un. | Valor: R$ ${currentBinPrice.toFixed(2)}`;
+                    document.getElementById('btn-comprar').classList.remove('hidden');
+                    currentBinQuery = bin;
+                }
+            });
+        }
+
+        function comprar() {
+            if (currentSaldo < currentBinPrice) return alert("Saldo Insuficiente!");
+
+            db.collection('store_db').where('bin', '==', currentBinQuery).where('status', '==', 'available').limit(1).get().then(snap => {
+                if(!snap.empty) {
+                    const item = snap.docs[0];
+                    db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-currentBinPrice) });
+                    db.collection('store_db').doc(item.id).update({ status: 'sold', owner: currentUser.uid });
+                    alert("Compra Concluída!");
+                    buscarBin();
+                    loadHistory();
+                }
+            });
+        }
+
+        function loadHistory() {
+            db.collection('store_db').where('owner', '==', currentUser.uid).onSnapshot(snap => {
+                historyData = [];
+                snap.forEach(doc => historyData.push(doc.data()));
+                updateVisualCard();
+            });
+        }
+
+        function updateVisualCard() {
+            if(historyData.length === 0) {
+                document.getElementById('v-num').innerText = "**** **** **** ****";
+                document.getElementById('v-name').innerText = "NENHUMA COMPRA";
+                document.getElementById('v-exp').innerText = "**/**";
+                document.getElementById('v-cvc').innerText = "***";
+                document.getElementById('history-count').innerText = "0 / 0";
+                return;
+            }
+            const data = historyData[currentHistoryIdx];
+            const numFmt = data.numero.match(/.{1,4}/g).join(' ');
+            const randomName = nomesAleatorios[Math.floor(Math.random() * nomesAleatorios.length)];
+            
+            document.getElementById('v-num').innerText = numFmt;
+            document.getElementById('v-name').innerText = randomName;
+            document.getElementById('v-exp').innerText = data.exp;
+            document.getElementById('v-cvc').innerText = data.cvc;
+            document.getElementById('history-count').innerText = `${currentHistoryIdx + 1} / ${historyData.length}`;
+        }
+
+        function navHistory(dir) {
+            currentHistoryIdx += dir;
+            if(currentHistoryIdx < 0) currentHistoryIdx = historyData.length - 1;
+            if(currentHistoryIdx >= historyData.length) currentHistoryIdx = 0;
+            updateVisualCard();
+        }
+
+        function logout() { auth.signOut(); }
+    </script>
+</body>
+</html>
