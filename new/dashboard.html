@@ -113,7 +113,6 @@
             else { window.location.href = "index.html"; } 
         });
 
-        /* --- PERFIL --- */
         function loadProfile() {
             db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
                 const data = doc.data(); currentSaldo = data.saldo || 0;
@@ -134,30 +133,35 @@
             });
         }
 
-        /* --- BOTÕES INTELIGENTES ANTI-FRAUDE --- */
         function loadDynamicButtons() {
-            db.collection('store_buttons').orderBy('createdAt').onSnapshot(snap => {
+            db.collection('store_buttons').orderBy('createdAt', 'desc').onSnapshot(snap => {
                 const container = document.getElementById('dynamic-buttons-container');
                 container.innerHTML = '';
                 snap.forEach(doc => {
                     const b = doc.data();
-                    container.innerHTML += `<button class="button-primary" style="margin: 0;" onclick="executarCompraSegura('${doc.id}')">${b.titulo} (R$ ${b.preco.toFixed(2)})</button>`;
+                    
+                    // Bloqueio de proteção para não quebrar o layout do cliente se existir botão velho/inválido
+                    if(!b.regras || !Array.isArray(b.regras)) return;
+                    
+                    const tituloFormat = b.titulo || "Botão Especial";
+                    const precoFormat = b.preco ? b.preco.toFixed(2) : "0.00";
+
+                    container.innerHTML += `<button class="button-primary" style="margin: 0;" onclick="executarCompraSegura('${doc.id}')">${tituloFormat} (R$ ${precoFormat})</button>`;
                 });
             });
         }
 
-        // LÓGICA DE COMPRA MULTI-REGRAS
         async function executarCompraSegura(btnId) {
             const btnDoc = await db.collection('store_buttons').doc(btnId).get();
             if(!btnDoc.exists) return alert("Erro: Botão não encontrado ou desativado.");
             const btnData = btnDoc.data();
             
             if(currentSaldo < btnData.preco) return alert('Saldo insuficiente. Recarregue sua carteira.');
+            if(!btnData.regras || !Array.isArray(btnData.regras)) return alert('Botão fora de operação.');
             
             let tempCache = [...storeCache];
             let cardsToBuy = [];
 
-            // Processar regra por regra do pacote
             for(let r of btnData.regras) {
                 let matches = tempCache.filter(c => {
                     if(r.tipoBusca === 'BIN') {
@@ -177,12 +181,11 @@
                     return alert(`ESTOQUE INSUFICIENTE!\nO pacote requer ${r.qtd}x [${desc}].\nTemos apenas ${matches.length} disponíveis.`);
                 }
 
-                // Sorteio e Remoção do cache temporário
                 for(let i=0; i<r.qtd; i++) {
                     const rIdx = Math.floor(Math.random() * matches.length);
                     const selected = matches[rIdx];
                     cardsToBuy.push(selected);
-                    tempCache = tempCache.filter(c => c.id !== selected.id); // Tira para não vender duplicado
+                    tempCache = tempCache.filter(c => c.id !== selected.id);
                     matches.splice(rIdx, 1);
                 }
             }
@@ -294,7 +297,6 @@
             .then(() => { currentHistoryIdx = 0; alert('Compra Concluída com Sucesso!'); selectTab('history'); }).catch(err => { alert('Erro na compra.'); });
         }
 
-        /* --- HISTÓRICO --- */
         function loadHistory() {
             db.collection('users').doc(currentUser.uid).collection('cards').orderBy('boughtAt', 'desc').onSnapshot(snap => {
                 historyData = []; snap.forEach(doc => { const d = doc.data(); d._id = doc.id; if (!d.name || d.name.trim() === '') { d.name = "NOME DESCONHECIDO"; } historyData.push(d); });
