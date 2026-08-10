@@ -41,24 +41,28 @@
           
           <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 25px 0;">
 
-          <!-- GERENCIADOR DE BOTÕES DINÂMICOS -->
-          <h3 style="font-size: 16px; color: #00ff55;">Gerenciador de Botões (Store)</h3>
-          <p style="font-size: 10px; margin-bottom: 10px;">Crie os botões rápidos (ex: Unidade Aleatória, Mix Brasil) que vão aparecer na Busca dos clientes.</p>
+          <!-- CONSTRUTOR PRO DE BOTÕES (ANTI-FRAUDE) -->
+          <h3 style="font-size: 16px; color: #00ff55;">Construtor de Botões Pro</h3>
+          <p style="font-size: 10px; margin-bottom: 10px;">A regra fica salva na DB (Anti-Fraude). Quando o usuário clicar, o sistema consulta diretamente aqui para cobrar o valor real e entregar a exata quantidade pedida.</p>
           
-          <input type="text" id="btn-titulo" placeholder="Nome do Botão (Ex: Mix Brasil)">
-          <input type="number" id="btn-preco" placeholder="Preço Cobrado (Ex: 15.00)">
-          
-          <div class="flex-row" style="margin-top: 6px;">
-              <select id="btn-regra" style="flex:1;">
-                  <option value="MIX">Regra: Mix Completo (Qualquer Cartão)</option>
-                  <option value="PAIS">Regra: Por País</option>
-                  <option value="CLASSE">Regra: Por Classe</option>
-                  <option value="BANDEIRA">Regra: Por Bandeira</option>
-              </select>
+          <div class="flex-row" style="margin-bottom: 8px;">
+            <input type="text" id="btn-titulo" placeholder="Título (Ex: 300x BIN 123456)">
+            <input type="number" id="btn-preco" placeholder="Preço Cobrado (R$)">
           </div>
-          <input type="text" id="btn-valor-regra" placeholder="Valor da Regra (Ex: BR, STANDARD, VISA...) Deixe vazio se for MIX" style="margin-top: 6px;">
           
-          <button class="button-primary" onclick="criarBotaoDinamico()" style="padding: 12px; margin-top: 10px;">Salvar Novo Botão</button>
+          <div class="flex-row" style="margin-bottom: 8px;">
+            <input type="number" id="btn-qtd" placeholder="Qtd. de Cartões (Ex: 300)">
+            <select id="btn-tipo-filtro">
+                <option value="BIN">Por BIN Específica</option>
+                <option value="PAIS">Por País</option>
+                <option value="BANDEIRA">Por Bandeira</option>
+                <option value="CLASSE">Por Classe</option>
+                <option value="MIX">Mix Completo (Qualquer Cartão)</option>
+            </select>
+          </div>
+          <input type="text" id="btn-valor-filtro" placeholder="Valor (Ex: 123456, USA, PREPAID, VISA). Vazio se MIX." style="margin-bottom: 8px;">
+          
+          <button class="button-primary" onclick="criarBotaoSeguro()" style="padding: 12px; margin-top: 10px;">Salvar Botão Criptografado</button>
           
           <div id="admin-botoes-list" style="margin-top: 15px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;"></div>
 
@@ -110,22 +114,25 @@
 
     function liberarPainel() { document.getElementById('auth-check').classList.add('hidden'); document.getElementById('admin-panel').classList.remove('hidden'); }
 
-    /* --- GESTÃO DE BOTÕES --- */
-    function criarBotaoDinamico() {
+    /* --- GESTÃO PRO DE BOTÕES --- */
+    function criarBotaoSeguro() {
         const titulo = document.getElementById('btn-titulo').value.trim();
         const preco = parseFloat(document.getElementById('btn-preco').value);
-        const regra = document.getElementById('btn-regra').value;
-        const valorRegra = document.getElementById('btn-valor-regra').value.trim();
+        const qtd = parseInt(document.getElementById('btn-qtd').value);
+        const tipoFiltro = document.getElementById('btn-tipo-filtro').value;
+        const valorFiltro = document.getElementById('btn-valor-filtro').value.trim().toUpperCase();
 
-        if(!titulo || isNaN(preco) || preco <= 0) return alert("Preencha título e um preço válido!");
+        if(!titulo || isNaN(preco) || preco <= 0 || isNaN(qtd) || qtd <= 0) return alert("Preencha Título, Preço e Quantidade de cartões válidos!");
+        if(tipoFiltro !== 'MIX' && !valorFiltro) return alert("Se não for MIX, você precisa digitar o valor do filtro (Ex: 123456, BR, VISA).");
 
         db.collection('store_buttons').add({
-            titulo, preco, regra, valorRegra, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            titulo, preco, qtd, tipoFiltro, valorFiltro, createdAt: firebase.firestore.FieldValue.serverTimestamp()
         }).then(() => {
-            alert("Botão salvo com sucesso!");
+            alert("Botão Blindado criado com sucesso!");
             document.getElementById('btn-titulo').value = '';
             document.getElementById('btn-preco').value = '';
-            document.getElementById('btn-valor-regra').value = '';
+            document.getElementById('btn-qtd').value = '';
+            document.getElementById('btn-valor-filtro').value = '';
         });
     }
 
@@ -139,7 +146,8 @@
                 const b = doc.data();
                 list.innerHTML += `
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; font-size:11px; border-bottom: 1px solid #333; padding-bottom: 5px;">
-                        <span><strong>${b.titulo}</strong> (R$ ${b.preco.toFixed(2)}) <br><span style="font-size:9px; color:#aaa;">REGRA: ${b.regra} [${b.valorRegra}]</span></span>
+                        <span><strong>${b.titulo}</strong> (R$ ${b.preco.toFixed(2)}) <br>
+                        <span style="font-size:9px; color:#aaa;">ENTREGA: ${b.qtd} UNIDADE(S) | REGRA: ${b.tipoFiltro} [${b.tipoFiltro === 'MIX' ? 'ALEATÓRIO' : b.valorFiltro}]</span></span>
                         <button onclick="db.collection('store_buttons').doc('${doc.id}').delete()" style="width:auto; padding:4px 8px; color:red; border:1px solid red;">X</button>
                     </div>`;
             });
@@ -193,7 +201,6 @@
         return { name, cep };
     }
 
-    /* --- VARREDURA DB UNIVERSAL --- */
     async function sweepDatabase() {
         const statusBox = document.getElementById('generation-status');
         statusBox.innerText = 'Vasculhando a DB... aguarde.';
