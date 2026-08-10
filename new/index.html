@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Login - DG 7 STORE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    
+    <script>
+        function onRecaptchaSuccess(token) {
+            setTimeout(() => {
+                const phaseCaptcha = document.getElementById('phaseCaptcha');
+                if(phaseCaptcha) phaseCaptcha.classList.add('hidden');
+                if(typeof window.startMiniGame === 'function') {
+                    window.startMiniGame();
+                }
+            }, 800);
+        }
+    </script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap');
+
+        body { margin: 0; padding: 0; background-color: #000000; font-family: 'Inter', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .user-background { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-image: url('https://i.imgur.com/cFlziwn.jpeg'); background-size: cover; background-position: center 30%; filter: grayscale(100%) sepia(50%) blur(2px) contrast(120%) brightness(50%); z-index: -4; transform: scale(1.05); }
+        .vignette-overlay { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: radial-gradient(circle at 50% 30%, transparent 15%, rgba(0,0,0,0.9) 85%); z-index: -3; }
+        .logo-font { font-family: 'Cinzel', serif; letter-spacing: 2px; }
+        .text-silver { background: linear-gradient(to bottom, #ffffff 0%, #a1a1a1 40%, #e0e0e0 60%, #6e6e6e 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0px 4px 10px rgba(0,0,0,0.9)); }
+        .text-gold { background: linear-gradient(to bottom, #fcf6ba 0%, #bf953f 40%, #fbf5b7 60%, #aa771c 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0px 4px 10px rgba(0,0,0,0.9)); }
+        .glass-panel { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-top: 1px solid rgba(255, 255, 255, 0.2); border-left: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(255, 255, 255, 0.02); border-radius: 40px; transform-style: preserve-3d; transition: transform 0.1s ease; }
+        .orb-trigger-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 30px; }
+        .orb-trigger { width: 90px; height: 90px; border-radius: 50%; cursor: pointer; position: relative; display: flex; align-items: center; justify-content: center; font-size: 2.8rem; transition: all 0.4s ease; margin-bottom: 8px; }
+        .orb-waiting { background: radial-gradient(circle, #fbbf24 20%, #b45309 80%); color: #000; box-shadow: 0 0 20px rgba(251, 191, 36, 0.5), inset 0 0 15px rgba(0,0,0,0.5); animation: pulseOrb 2s infinite alternate; }
+        .orb-verified { background: radial-gradient(circle, #10b981 20%, #047857 80%); color: #fff; box-shadow: 0 0 30px rgba(16, 185, 129, 0.6), inset 0 0 15px rgba(0,0,0,0.5); }
+        .orb-label { font-family: 'Space Mono', monospace; font-size: 0.75rem; color: #fbbf24; letter-spacing: 2px; text-transform: uppercase; }
+        @keyframes pulseOrb { 0% { transform: scale(0.95); box-shadow: 0 0 15px rgba(251, 191, 36, 0.4); } 100% { transform: scale(1.05); box-shadow: 0 0 35px rgba(251, 191, 36, 0.8); } }
+        .input-wrapper { position: relative; margin-bottom: 24px; }
+        .input-glass { background: transparent; border: none; border-bottom: 1px solid rgba(255, 255, 255, 0.3); color: #fff; width: 100%; padding: 8px 8px 8px 36px; font-size: 0.9rem; font-weight: 300; transition: all 0.3s ease; }
+        .input-glass:focus { outline: none; border-bottom: 1px solid #fbbf24; }
+        .input-glass::placeholder { color: rgba(255, 255, 255, 0.5); }
+        .input-icon { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); color: rgba(255, 255, 255, 0.8); font-size: 1.1rem; }
+        .btn-login { background: linear-gradient(90deg, #37143e 0%, #293f77 100%); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); transition: all 0.3s ease; border-radius: 30px; }
+        .btn-login:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(41, 63, 119, 0.7); transform: translateY(-2px); background: linear-gradient(90deg, #44194d 0%, #324c91 100%); }
+        .btn-login:disabled { background: #1a1a1a; color: #555; cursor: not-allowed; box-shadow: none; border: 1px solid #333;}
+        #securityModal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+        #securityModal.active { opacity: 1; pointer-events: all; }
+        .terminal-text { font-family: 'Space Mono', monospace; color: #00ffcc; font-size: 0.85rem; text-align: center; margin-bottom: 15px;}
+        .sync-container { display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; gap: 20px; margin-bottom: 30px; }
+        .number-box { display: flex; flex-direction: column; align-items: center; width: 45%; }
+        .number-label { font-family: 'Space Mono', monospace; font-size: 0.7rem; letter-spacing: 2px; margin-bottom: 10px; color: #888; }
+        .number-display { width: 100%; aspect-ratio: 1; border-radius: 16px; border: 2px solid #333; display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 4rem; font-weight: bold; background: radial-gradient(circle, #1a1a1a, #000); box-shadow: inset 0 0 30px #000; }
+        .target-box { border-color: #00ffcc; color: #00ffcc; text-shadow: 0 0 20px rgba(0,255,204,0.6); box-shadow: inset 0 0 30px rgba(0,255,204,0.1); }
+        .system-box { border-color: #fbbf24; color: #fbbf24; text-shadow: 0 0 20px rgba(251,191,36,0.6); box-shadow: inset 0 0 30px rgba(251,191,36,0.1); transition: all 0.2s ease;}
+        .progress-text { font-family: 'Space Mono', monospace; font-size: 0.9rem; color: #10b981; margin-bottom: 30px; letter-spacing: 1px;}
+        .capture-btn { background: #fbbf24; color: #000; font-weight: bold; border-radius: 30px; padding: 16px 40px; font-family: 'Space Mono', monospace; letter-spacing: 2px; transition: 0.2s; font-size: 1.2rem; box-shadow: 0 0 20px rgba(251, 191, 36, 0.4); border: none; cursor: pointer; width: 100%; max-w: 280px; }
+        .capture-btn:active { transform: scale(0.95); box-shadow: 0 0 10px rgba(251, 191, 36, 0.8); }
+        .chances-text { font-family: 'Space Mono', monospace; color: #ff4444; font-size: 0.85rem; margin-top: 25px; }
+        .timer-warning { font-family: 'Space Mono', monospace; color: #fbbf24; font-size: 0.7rem; margin-top: 10px; opacity: 0.7; text-align: center;}
+        .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-2px, 0, 0); } 20%, 80% { transform: translate3d(4px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-6px, 0, 0); } 40%, 60% { transform: translate3d(6px, 0, 0); } }
+        .flash { animation: flashAnim 0.3s ease-out; }
+        @keyframes flashAnim { 0% { background-color: rgba(251,191,36,0.4); } 100% { background-color: transparent; } }
+        #lockoutScreen { display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .timer-text { font-family: 'Space Mono', monospace; font-size: 3.5rem; color: #ff0040; text-shadow: 0 0 20px #ff0040; margin: 20px 0; }
+        .g-recaptcha { margin-top: 15px; margin-bottom: 10px; }
+    </style>
+</head>
+<body class="text-white">
+
+    <div class="user-background"></div>
+    <div class="vignette-overlay"></div>
+
+    <div id="securityModal">
+        <div id="phaseCaptcha" class="flex flex-col items-center">
+            <h3 class="font-mono text-cyan-400 mb-2 text-sm uppercase tracking-widest text-center">Verificação Necessária</h3>
+            <p class="font-mono text-gray-400 text-xs text-center mb-6 max-w-[260px]">Detectamos um acesso não reconhecido. Prove que você é humano.</p>
+            <div class="g-recaptcha" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" data-callback="onRecaptchaSuccess" data-theme="dark"></div>
+        </div>
+
+        <div id="phaseGame" class="hidden flex-col items-center w-full max-w-sm px-6">
+            <div class="terminal-text">Sincronize a chave criptográfica.</div>
+            <div class="progress-text" id="progressText">Sincronizados: 0 / 6</div>
+            <div class="sync-container">
+                <div class="number-box"><span class="number-label">ALVO</span><div class="number-display target-box" id="targetNumber">-</div></div>
+                <div class="number-box"><span class="number-label text-yellow-400">SISTEMA</span><div class="number-display system-box" id="systemNumber">-</div></div>
+            </div>
+            <button id="captureBtn" class="capture-btn">SINCRONIZAR</button>
+            <div class="timer-warning">Reseta em 40s de inatividade.</div>
+            <div class="chances-text" id="chancesDisplay">Chances restantes: 7</div>
+            <button id="cancelGameBtn" class="mt-8 text-xs text-white/30 hover:text-white underline font-mono uppercase tracking-widest">Abortar Protocolo</button>
+        </div>
+
+        <div id="lockoutScreen" class="w-full max-w-sm px-4">
+            <i class="ph-bold ph-warning-octagon text-6xl text-red-500 mb-4"></i>
+            <h2 class="text-xl font-bold tracking-widest text-red-500 font-mono">ACESSO BLOQUEADO</h2>
+            <p class="text-xs text-gray-400 mt-2 font-mono">Falhas sucessivas de segurança.<br>Proteção anti-bruteforce ativada.</p>
+            <div class="timer-text" id="lockoutTimerDisplay">05:00</div>
+        </div>
+    </div>
+
+    <div class="w-full max-w-[340px] px-4 z-10 flex flex-col items-center">
+        <div class="flex items-center mb-8 drop-shadow-2xl">
+            <div class="logo-font text-5xl font-bold flex items-center">
+                <span class="text-silver">DG</span><span class="text-gold text-6xl -mx-1 italic">7</span><span class="text-silver text-3xl mt-2">STORE</span>
+            </div>
+        </div>
+
+        <div id="tiltCard" class="glass-panel w-full pt-10 pb-8 px-8 relative flex flex-col items-center">
+            <div class="orb-trigger-container">
+                <div id="orbTrigger" class="orb-trigger orb-waiting" title="Iniciar Verificação"><i class="ph-fill ph-robot"></i></div>
+                <span id="orbLabel" class="orb-label">Verificação</span>
+            </div>
+
+            <form id="loginForm" class="w-full space-y-2">
+                <div class="input-wrapper">
+                    <i class="ph-bold ph-envelope-simple input-icon"></i>
+                    <input type="email" id="username" placeholder="Email" class="input-glass" disabled>
+                </div>
+                <div class="input-wrapper mb-6">
+                    <i class="ph-bold ph-lock-key input-icon"></i>
+                    <input type="password" id="password" placeholder="Senha" class="input-glass" disabled>
+                </div>
+
+                <div id="message" class="hidden text-center text-xs font-medium py-2 mb-4 rounded border backdrop-blur-md"></div>
+
+                <button type="submit" id="loginBtn" class="btn-login w-full py-3.5 mt-2 text-white font-semibold tracking-wider text-sm font-mono" disabled>
+                    SISTEMA BLOQUEADO
+                </button>
+                
+                <button type="button" id="toggleModeBtn" class="mt-4 text-xs text-gray-400 hover:text-white font-mono tracking-widest block w-full text-center transition-colors" disabled>
+                    CADASTRAR NOVO ACESSO
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyAt7cAOc3I02wg31EHq39aQigYY_CyxtkY", authDomain: "dg7store-c9636.firebaseapp.com", projectId: "dg7store-c9636", storageBucket: "dg7store-c9636.firebasestorage.app", messagingSenderId: "118364909075", appId: "1:118364909075:web:e861cc89702144e62d99e6" };
+        if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const MAX_CHANCES = 7;
+        const LOCKOUT_DURATION_MS = 5 * 60 * 1000; 
+        const INACTIVITY_LIMIT_MS = 40000; 
+        const ROULETTE_SPEED_MS = 3500; 
+
+        let chances = (() => { const stored = parseInt(localStorage.getItem('dg7_chances'), 10); return Number.isFinite(stored) ? Math.min(Math.max(stored, 0), MAX_CHANCES) : MAX_CHANCES; })();
+        let isHumanVerified = false;
+        let isLoginMode = true;
+        
+        let targetSequence = [];
+        let currentIndex = 0;
+        let currentDisplayNumber = -1;
+        let rouletteInterval, inactivityTimeout, spinCount = 0; 
+
+        const modal = document.getElementById('securityModal');
+        const phaseCaptcha = document.getElementById('phaseCaptcha');
+        const phaseGame = document.getElementById('phaseGame');
+        const lockoutScreen = document.getElementById('lockoutScreen');
+        const orbTrigger = document.getElementById('orbTrigger');
+        const orbLabel = document.getElementById('orbLabel');
+        const loginBtn = document.getElementById('loginBtn');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const targetNumberUI = document.getElementById('targetNumber');
+        const systemNumberUI = document.getElementById('systemNumber');
+        const progressTextUI = document.getElementById('progressText');
+
+        function checkLockout() {
+            const lockoutEnd = localStorage.getItem('dg7_lockout_end');
+            if (lockoutEnd) {
+                const now = Date.now();
+                if (now < parseInt(lockoutEnd)) { triggerLockout(parseInt(lockoutEnd)); return true; } 
+                else { localStorage.removeItem('dg7_lockout_end'); localStorage.setItem('dg7_chances', MAX_CHANCES); chances = MAX_CHANCES; return false; }
+            }
+            if(chances <= 0) { const newLockout = Date.now() + LOCKOUT_DURATION_MS; localStorage.setItem('dg7_lockout_end', newLockout); triggerLockout(newLockout); return true; }
+            return false;
+        }
+
+        function triggerLockout(endTime) {
+            modal.classList.add('active'); phaseCaptcha.classList.add('hidden'); phaseGame.classList.add('hidden'); lockoutScreen.style.display = 'flex';
+            orbTrigger.style.pointerEvents = 'none'; orbTrigger.className = 'orb-trigger bg-red-600 text-white'; orbTrigger.innerHTML = '<i class="ph-bold ph-lock"></i>'; orbTrigger.style.boxShadow = '0 0 20px rgba(255,0,0,0.5)'; orbLabel.innerText = "BLOQUEADO"; orbLabel.style.color = "#ef4444";
+            const timerDisplay = document.getElementById('lockoutTimerDisplay');
+            const interval = setInterval(() => {
+                const diff = endTime - Date.now();
+                if (diff <= 0) { clearInterval(interval); location.reload(); } 
+                else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); timerDisplay.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`; }
+            }, 1000);
+        }
+
+        if (!checkLockout()) { orbTrigger.addEventListener('click', openSecurityCheck); }
+
+        window.startMiniGame = startMiniGame; 
+
+        function openSecurityCheck() { if(isHumanVerified) return; modal.classList.add('active'); phaseCaptcha.classList.remove('hidden'); phaseGame.classList.add('hidden'); }
+
+        function startMiniGame() { phaseGame.classList.replace('hidden', 'flex'); document.getElementById('chancesDisplay').innerText = `Chances restantes: ${chances}`; targetSequence = []; for(let i=0; i<6; i++) targetSequence.push(Math.floor(Math.random() * 10)); currentIndex = 0; updateGameUI(); startRoulette(); resetInactivityTimer(); }
+
+        function updateGameUI() { targetNumberUI.innerText = targetSequence[currentIndex]; progressTextUI.innerText = `Sincronizados: ${currentIndex} / 6`; }
+
+        function startRoulette() { clearInterval(rouletteInterval); spinCount = 0; spinRoulette(); rouletteInterval = setInterval(spinRoulette, ROULETTE_SPEED_MS); }
+
+        function spinRoulette() {
+            let candidate = Math.floor(Math.random() * 10);
+            if (Math.random() < 0.28) candidate = targetSequence[currentIndex];
+            else if (candidate === targetSequence[currentIndex]) candidate = (candidate + 1) % 10;
+            currentDisplayNumber = candidate; systemNumberUI.innerText = currentDisplayNumber;
+            systemNumberUI.classList.remove('flash'); void systemNumberUI.offsetWidth; systemNumberUI.classList.add('flash');
+        }
+
+        function resetInactivityTimer() { clearTimeout(inactivityTimeout); inactivityTimeout = setTimeout(() => { handleGameError(true); }, INACTIVITY_LIMIT_MS); }
+
+        document.getElementById('captureBtn').addEventListener('click', () => {
+            if (currentDisplayNumber === targetSequence[currentIndex]) {
+                currentIndex++; resetInactivityTimer();
+                if (currentIndex >= targetSequence.length) handleGameSuccess();
+                else { updateGameUI(); startRoulette(); }
+            } else { handleGameError(false); }
+        });
+
+        function handleGameError(isTimeout) {
+            chances--; localStorage.setItem('dg7_chances', chances); document.getElementById('chancesDisplay').innerText = `Chances restantes: ${chances}`;
+            const gameUi = document.getElementById('phaseGame'); gameUi.classList.add('shake'); setTimeout(() => gameUi.classList.remove('shake'), 500);
+            if(checkLockout()) return; 
+            if(isTimeout) { systemNumberUI.innerText = "!"; systemNumberUI.style.color = "#ff4444"; setTimeout(() => { systemNumberUI.style.color = "#fbbf24"; }, 1000); }
+            startMiniGame();
+        }
+
+        function handleGameSuccess() {
+            clearInterval(rouletteInterval); clearTimeout(inactivityTimeout); isHumanVerified = true;
+            localStorage.setItem('dg7_chances', MAX_CHANCES); chances = MAX_CHANCES;
+            orbTrigger.className = 'orb-trigger orb-verified'; orbTrigger.innerHTML = '<i class="ph-bold ph-check"></i>'; orbTrigger.style.pointerEvents = 'none'; orbLabel.innerText = "SISTEMA LIVRE"; orbLabel.style.color = "#10b981";
+            usernameInput.disabled = false; passwordInput.disabled = false; loginBtn.disabled = false; loginBtn.innerText = "LOGIN - ACESSAR";
+            document.getElementById('toggleModeBtn').disabled = false; 
+            modal.classList.remove('active');
+        }
+
+        document.getElementById('cancelGameBtn').addEventListener('click', () => { clearInterval(rouletteInterval); clearTimeout(inactivityTimeout); modal.classList.remove('active'); if(typeof grecaptcha !== 'undefined') grecaptcha.reset(); });
+
+        document.getElementById('toggleModeBtn').addEventListener('click', () => {
+            isLoginMode = !isLoginMode;
+            const btn = document.getElementById('loginBtn');
+            const toggleBtn = document.getElementById('toggleModeBtn');
+            if (isLoginMode) { btn.innerText = "LOGIN - ACESSAR"; toggleBtn.innerText = "CADASTRAR NOVO ACESSO"; } 
+            else { btn.innerText = "REGISTRAR - CRIAR CONTA"; toggleBtn.innerText = "JÁ POSSUI ACESSO? FAÇA LOGIN"; }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (!isHumanVerified) { mostrarErro('Passo de segurança não concluído.'); return; }
+            const email = usernameInput.value.trim(); const password = passwordInput.value;
+            if (!email || !password) { mostrarErro('Preencha email e senha.'); return; }
+
+            if (isLoginMode) {
+                auth.signInWithEmailAndPassword(email, password).then(() => { window.location.href = 'dashboard.html'; })
+                .catch(err => { mostrarErro((err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') ? 'Credenciais inválidas.' : 'Erro ao autenticar.'); });
+            } else {
+                auth.createUserWithEmailAndPassword(email, password).then(cred => {
+                    return db.collection('users').doc(cred.user.uid).set({ saldo: 0, avatarUrl: '', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                }).then(() => { window.location.href = 'dashboard.html'; }).catch(err => {
+                    if (err.code === 'auth/email-already-in-use') mostrarErro('Este email já está cadastrado.');
+                    else if (err.code === 'auth/weak-password') mostrarErro('A senha deve ter pelo menos 6 caracteres.');
+                    else mostrarErro('Erro ao registrar.');
+                });
+            }
+        });
+
+        function mostrarErro(mensagem) {
+            const msg = document.getElementById('message');
+            msg.className = 'text-center text-xs font-medium py-2 mb-4 rounded border backdrop-blur-md text-red-300 bg-red-900/40 border-red-500/40';
+            msg.textContent = mensagem; msg.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
