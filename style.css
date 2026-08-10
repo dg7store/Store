@@ -125,25 +125,27 @@ button:active {
 .text-center { text-align: center; }
 .status-pill { text-align: center; font-size: 12px; color: var(--primary-neon); margin: 5px 0; }
 
-/* Tactical Avatar Box - Octagon shape */
+/* Tactical Avatar Box - Circular red frame for profile */
 .avatar-container { 
-    width: 90px; 
-    height: 90px; 
-    border: 2px solid var(--primary-neon); 
-    clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%);
-    margin: 0 auto 15px; 
+    width: 110px; 
+    height: 110px; 
+    border: 4px solid var(--secondary-neon); 
+    border-radius: 50%;
+    margin: 0 auto 18px; 
     display: flex; 
     justify-content: center; 
     align-items: center; 
-    background: #000; 
+    background: #120000;
+    box-shadow: 0 0 24px rgba(255, 42, 42, 0.22);
 }
 
 /* Night Vision / Matrix effect on user photo */
 .avatar-container img { 
     width: 100%; 
     height: 100%; 
+    border-radius: 50%;
     object-fit: cover; 
-    filter: grayscale(100%) contrast(1.5) sepia(100%) hue-rotate(75deg); 
+    filter: grayscale(100%) contrast(1.2) sepia(50%) brightness(1.05); 
 }
 
 .saldo-box { 
@@ -157,6 +159,38 @@ button:active {
     text-shadow: 0 0 8px rgba(255, 42, 42, 0.5); 
     position: relative;
 }
+
+.menu-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 18px 0 24px;
+}
+
+.tab-button {
+    flex: 1 1 45%;
+    padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+    color: var(--text-main);
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.tab-button:hover { transform: translateY(-1px); }
+
+.tab-active {
+    background: rgba(255, 42, 42, 0.95);
+    color: #fff;
+    border-color: rgba(255, 42, 42, 0.95);
+}
+
+.section-pane { display: block; }
+.section-hidden { display: none; }
 .saldo-box::before {
     content: 'DEF_BUDGET_ALLOCATED';
     position: absolute; top: 2px; left: 5px; font-size: 8px; color: #555;
