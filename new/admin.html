@@ -37,7 +37,7 @@
           
           <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 25px 0;">
 
-          <!-- NOVO CONSTRUTOR PRO DE BOTÕES (VISUAL) -->
+          <!-- CONSTRUTOR PRO DE BOTÕES -->
           <h3 style="font-size: 16px; color: #00ff55;">Construtor de Combos & Botões</h3>
           <p style="font-size: 10px; margin-bottom: 10px;">Adicione regras dinâmicas que puxam opções reais do seu estoque (Anti-Fraude). O que você criar aqui vai direto para a loja.</p>
           
@@ -148,7 +148,6 @@
                 </select>
             </div>
             
-            <!-- Opções se for FILTRO -->
             <div id="filtro-opcoes-${id}">
                 <div class="flex-row">
                     <select id="regra-bandeira-${id}" style="flex:0.5;">${getOptionsHtml(setBandeiras, 'QUALQUER BANDEIRA')}</select>
@@ -165,7 +164,6 @@
                 </select>
             </div>
 
-            <!-- Opções se for BIN -->
             <div id="bin-opcoes-${id}" class="hidden">
                 <select id="regra-bin-${id}">
                     ${getOptionsHtml(setBins, 'SELECIONE UMA BIN EM ESTOQUE...')}
@@ -220,9 +218,8 @@
             regrasArray.push(regraObj);
         });
 
-        if(regrasArray.length !== boxes.length) return; // Parou por erro
+        if(regrasArray.length !== boxes.length) return;
 
-        // Salvar no banco
         db.collection('store_buttons').add({
             titulo: titulo,
             preco: preco,
@@ -238,7 +235,7 @@
     }
 
     function carregarBotoesAdmin() {
-        db.collection('store_buttons').orderBy('createdAt').onSnapshot(snap => {
+        db.collection('store_buttons').orderBy('createdAt', 'desc').onSnapshot(snap => {
             const list = document.getElementById('admin-botoes-list');
             list.innerHTML = '';
             if(snap.empty) { list.innerHTML = '<span style="font-size:10px; color:#aaa;">Nenhum botão criado.</span>'; return; }
@@ -246,21 +243,29 @@
             snap.forEach(doc => {
                 const b = doc.data();
                 let regrasResumo = "";
-                b.regras.forEach((r, idx) => {
-                    if(r.tipoBusca === 'BIN') regrasResumo += `<br>▶ ${r.qtd}x BIN ${r.bin}`;
-                    else regrasResumo += `<br>▶ ${r.qtd}x ${r.pais==='QUALQUER'?'Mix':r.pais} ${r.bandeira==='QUALQUER'?'':r.bandeira} ${r.classe==='QUALQUER'?'':r.classe}`;
-                });
+                
+                // Trava de segurança para não quebrar a tela se tiver botão antigo
+                if (b.regras && Array.isArray(b.regras)) {
+                    b.regras.forEach((r, idx) => {
+                        if(r.tipoBusca === 'BIN') regrasResumo += `<br>▶ ${r.qtd}x BIN ${r.bin}`;
+                        else regrasResumo += `<br>▶ ${r.qtd}x ${r.pais==='QUALQUER'?'Mix':r.pais} ${r.bandeira==='QUALQUER'?'':r.bandeira} ${r.classe==='QUALQUER'?'':r.classe}`;
+                    });
+                } else {
+                    regrasResumo = "<br>▶ <span style='color:red;'>[Botão Formato Antigo]</span>";
+                }
+
+                const titulo = b.titulo || "SEM TÍTULO";
+                const precoFormat = b.preco ? b.preco.toFixed(2) : "0.00";
 
                 list.innerHTML += `
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; font-size:11px; border-bottom: 1px solid #333; padding-bottom: 5px;">
-                        <span><strong style="color:var(--primary-neon)">${b.titulo}</strong> (R$ ${b.preco.toFixed(2)}) <span style="font-size:9px; color:#aaa;">${regrasResumo}</span></span>
-                        <button onclick="db.collection('store_buttons').doc('${doc.id}').delete()" style="width:auto; padding:4px 8px; color:red; border:1px solid red;">X</button>
+                        <span><strong style="color:var(--primary-neon)">${titulo}</strong> (R$ ${precoFormat}) <span style="font-size:9px; color:#aaa;">${regrasResumo}</span></span>
+                        <button onclick="db.collection('store_buttons').doc('${doc.id}').delete()" style="width:auto; padding:4px 8px; color:red; border:1px solid red; font-weight:bold;">X</button>
                     </div>`;
             });
         });
     }
 
-    let parsedItems = []; let uniqueBins = new Set(); 
     const nomesAleatoriosBR = ["MARCELO P SILVA", "FERNANDA SOUZA", "ROBERTO C LIMA", "JULIANA COSTA", "MARCOS OLIVEIRA", "LUCAS A MARTINS", "ANA SANTOS", "GABRIEL R ALVES"];
     const nomesAleatoriosUS = ["JOHN SMITH", "MARY JOHNSON", "ROBERT WILLIAMS", "LINDA BROWN", "MICHAEL JONES", "WILLIAM GARCIA", "DAVID MARTINEZ"];
 
@@ -344,7 +349,7 @@
           [...uniqueBins].forEach(bin => { 
               outputHTML += `<div style="margin-bottom: 12px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;"> 
               BIN <strong>${bin}</strong> (${metaMap[bin].bandeira} - ${metaMap[bin].banco}): 
-              <input type="number" id="price-${bin}" placeholder="R$ (Opcional, só se for vender pela Busca Live)" style="width: 100%; padding: 12px; margin-top: 8px; font-size: 14px;"> 
+              <input type="number" id="price-${bin}" placeholder="R$ (Opcional)" style="width: 100%; padding: 12px; margin-top: 8px; font-size: 14px;"> 
               </div>`; 
           });
           document.getElementById('parsed-results').innerHTML = outputHTML;
@@ -356,7 +361,7 @@
       let binPrices = {}; 
       [...uniqueBins].forEach(bin => {
           let priceVal = parseFloat(document.getElementById(`price-${bin}`).value);
-          if (isNaN(priceVal) || priceVal <= 0) { priceVal = 0; } // Permite preço 0 para quem vende só por pacote/botão
+          if (isNaN(priceVal) || priceVal <= 0) { priceVal = 0; } 
           binPrices[bin] = priceVal;
       });
       const total = parsedItems.length; const batchSize = 500; let written = 0;
