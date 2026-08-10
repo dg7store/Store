@@ -31,31 +31,47 @@
 
             <div class="menu-tabs">
                 <button id="tab-profile" class="tab-button tab-active" onclick="selectTab('profile')">Perfil</button>
-                <button id="tab-balance" class="tab-button" onclick="selectTab('balance')">Saldo</button>
+                <button id="tab-balance" class="tab-button" onclick="selectTab('balance')">Carteira</button>
             </div>
 
             <div id="section-profile" class="section-pane">
                 <div class="status-pill">Perfil padrão carregado. URL só aparece ao alterar.</div>
                 <h3 style="margin-top: 12px;">Configurações de Perfil</h3>
                 <input type="text" id="avatar-url" placeholder="URL da Foto de Perfil">
-                <input type="text" id="jsonbin-id" placeholder="JSONBin ID">
-                <input type="password" id="jsonbin-key" placeholder="JSONBin Key (Auth)">
                 <button class="button-primary" onclick="salvarPerfil()">Salvar Configurações</button>
+                <div style="margin-top:10px; font-size:12px; color:var(--muted);">URL só aparece ao alterar; a foto padrão é aplicada a todos.</div>
             </div>
 
             <div id="section-balance" class="section-pane section-hidden">
-                <div class="status-pill">Apenas saldo visível aqui. Compras aleatórias disponíveis.</div>
-                <h3 style="margin-top: 22px;">Comprar Aleatório</h3>
-                <button class="button-secondary" onclick="comprarAleatoria()">Comprar Aleatória</button>
+                <div class="status-pill">Opções de carteira: resgate, unidade e histórico.</div>
+                <h3 style="margin-top: 22px;">Resgatar Código</h3>
+                <div class="flex-row"><input type="text" id="resgate-codigo" placeholder="Código para resgatar"><button class="button-secondary" onclick="resgatarCodigo()">Resgatar</button></div>
+                <h3 style="margin-top: 18px;">Unidade</h3>
+                <p style="font-size:12px; color:var(--muted)">Compra uma unidade aleatória com valor exato de R$ 10,00</p>
+                <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+                    <button id="btn-unidade" class="button-secondary" onclick="comprarUnidade()">Unidade</button>
+                    <button class="button-danger" onclick="limparHistorico()" title="Apagar todo o histórico">🗑️ Limpar Histórico</button>
+                </div>
                 <p id="random-buy-result" style="margin-top: 12px; font-size: 12px; color: var(--text-main);"></p>
             </div>
 
-            <div id="dashboard-hidden-sections" class="section-hidden">
+            <div id="dashboard-hidden-sections">
                 <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 22px 0;">
 
                 <h3>Store - Busca BIN</h3>
                 <div class="flex-row">
                     <input type="text" id="bin-search" placeholder="Primeiros 6 dígitos" maxlength="6">
+                    <select id="filter-classe">
+                        <option value="">Todas classes</option>
+                        <option value="VISA">VISA</option>
+                        <option value="MASTERCARD">MASTERCARD</option>
+                        <option value="AMEX">AMEX</option>
+                    </select>
+                    <select id="filter-bandeira">
+                        <option value="">Todas bandeiras</option>
+                        <option value="NACIONAL">Nacional</option>
+                        <option value="INTERNACIONAL">Internacional</option>
+                    </select>
                     <button class="button-secondary" onclick="buscarBin()" style="flex: 1 1 100%;">Buscar</button>
                 </div>
                 <p id="bin-result" style="text-align: center; margin-top: 10px; color: var(--primary-neon); font-size:12px;"></p>
@@ -64,12 +80,11 @@
                 <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 22px 0;">
 
                 <h3>Meu Histórico</h3>
-                <div class="cc-viewer">
-                    <div class="cc-number" id="v-num">**** **** **** ****</div>
-                    <div class="cc-name" id="v-name">NOME ALEATORIO</div>
-                    <div class="cc-exp" id="v-exp">**/**</div>
-                    <div class="cc-cvc" id="v-cvc">***</div>
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                    <button class="button-secondary" onclick="downloadHistoryTxt()">Baixar histórico (.txt)</button>
+                    <button class="button-secondary" onclick="exibirTodosCards()">Mostrar todos</button>
                 </div>
+                <div class="cc-viewer" id="history-list"></div>
                 <div class="nav-arrows">
                     <button class="button-secondary" onclick="navHistory(-1)">◄ Voltar</button>
                     <button class="button-secondary" onclick="navHistory(1)">Avançar ►</button>
@@ -185,8 +200,21 @@
         let currentBinPrice = 0;
 
         function buscarBin() {
-            const bin = document.getElementById('bin-search').value;
-            db.collection('store_db').where('bin', '==', bin).where('status', '==', 'available').get().then(snap => {
+            const bin = document.getElementById('bin-search').value.trim();
+            if (!/^[0-9]{1,6}$/.test(bin)) {
+                document.getElementById('bin-result').innerText = "Digite até 6 dígitos numéricos.";
+                document.getElementById('btn-comprar').classList.add('hidden');
+                return;
+            }
+            const classe = document.getElementById('filter-classe').value;
+            const bandeira = document.getElementById('filter-bandeira').value;
+
+            let query = db.collection('store_db').where('status', '==', 'available');
+            query = query.where('bin_prefix', '==', bin);
+            if (classe) query = query.where('classe', '==', classe);
+            if (bandeira) query = query.where('bandeira', '==', bandeira);
+
+            query.get().then(snap => {
                 if(snap.empty) {
                     document.getElementById('bin-result').innerText = "Estoque: 0";
                     document.getElementById('btn-comprar').classList.add('hidden');
@@ -196,33 +224,53 @@
                     document.getElementById('btn-comprar').classList.remove('hidden');
                     currentBinQuery = bin;
                 }
+            }).catch(err => {
+                console.error('buscarBin error', err);
+                document.getElementById('bin-result').innerText = "Erro ao buscar.";
             });
         }
 
         function comprar() {
             if (currentSaldo < currentBinPrice) return alert("Saldo Insuficiente!");
 
-            db.collection('store_db').where('bin', '==', currentBinQuery).where('status', '==', 'available').limit(1).get().then(snap => {
+            db.collection('store_db').where('bin_prefix', '==', currentBinQuery).where('status', '==', 'available').limit(1).get().then(snap => {
                 if(!snap.empty) {
                     const item = snap.docs[0];
-                    db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-currentBinPrice) });
-                    db.collection('store_db').doc(item.id).update({ status: 'sold', owner: currentUser.uid });
-                    alert("Compra Concluída!");
-                    buscarBin();
-                    loadHistory();
+                    const itemData = item.data();
+                    const price = itemData.price || currentBinPrice;
+                    db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) });
+                    db.collection('store_db').doc(item.id).update({ status: 'sold', owner: currentUser.uid }).then(() => {
+                        alert("Compra Concluída!");
+                        buscarBin();
+                        loadHistory();
+                    });
                 }
             });
         }
 
         function loadHistory() {
-            db.collection('store_db').where('owner', '==', currentUser.uid).onSnapshot(snap => {
+            db.collection('store_db').where('owner', '==', currentUser.uid).orderBy('soldAt', 'desc').onSnapshot(snap => {
                 historyData = [];
-                snap.forEach(doc => historyData.push(doc.data()));
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    d._id = doc.id;
+                    // Ensure name exists
+                    if (!d.name || d.name.trim() === '') {
+                        const generated = nomesAleatorios[Math.floor(Math.random() * nomesAleatorios.length)];
+                        d.name = generated;
+                        db.collection('store_db').doc(doc.id).update({ name: generated }).catch(()=>{});
+                    }
+                    historyData.push(d);
+                });
+                currentHistoryIdx = 0;
+                renderHistoryList();
                 updateVisualCard();
             });
         }
 
         function updateVisualCard() {
+            const singleView = document.getElementById('v-num');
+            if(!singleView) return; // old view absent
             if(historyData.length === 0) {
                 document.getElementById('v-num').innerText = "**** **** **** ****";
                 document.getElementById('v-name').innerText = "NENHUMA COMPRA";
@@ -232,14 +280,98 @@
                 return;
             }
             const data = historyData[currentHistoryIdx];
-            const numFmt = data.numero.match(/.{1,4}/g).join(' ');
-            const randomName = nomesAleatorios[Math.floor(Math.random() * nomesAleatorios.length)];
-            
+            const numFmt = (data.numero || '****************').match(/.{1,4}/g).join(' ');
             document.getElementById('v-num').innerText = numFmt;
-            document.getElementById('v-name').innerText = randomName;
-            document.getElementById('v-exp').innerText = data.exp;
-            document.getElementById('v-cvc').innerText = data.cvc;
+            document.getElementById('v-name').innerText = data.name || 'SEM NOME';
+            document.getElementById('v-exp').innerText = data.exp || '**/**';
+            document.getElementById('v-cvc').innerText = data.cvc || '***';
             document.getElementById('history-count').innerText = `${currentHistoryIdx + 1} / ${historyData.length}`;
+        }
+
+        function renderHistoryList() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            historyData.forEach((d, idx) => {
+                const card = document.createElement('div');
+                card.className = 'history-card';
+                const num = (d.numero || '****************').slice(0,16);
+                const numFmt = num.match(/.{1,4}/g).join(' ');
+                card.innerHTML = `
+                    <div class="card-top">
+                        <div class="card-num">${numFmt}</div>
+                        <div class="card-actions">
+                            <button class="button-primary" onclick="comprarUnico('${d._id}')">Comprar</button>
+                            <button class="button-danger" onclick="apagarCompra('${d._id}')">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="card-body">Nome: ${d.name || ''} | Exp: ${d.exp || ''} | CVC: ${d.cvc || ''}</div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function exibirTodosCards() { renderHistoryList(); }
+
+        function comprarUnico(docId) {
+            // compra uma unidade específica do histórico (recompra)
+            db.collection('store_db').doc(docId).get().then(snap => {
+                if(!snap.exists) return alert('Item não encontrado.');
+                const data = snap.data();
+                const price = data.price || 10.00;
+                if (currentSaldo < price) return alert('Saldo insuficiente.');
+                db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) });
+                db.collection('store_db').doc(docId).update({ status: 'sold', owner: currentUser.uid }).then(()=>{ loadHistory(); loadProfile(); alert('Compra concluída.'); });
+            });
+        }
+
+        function apagarCompra(docId) {
+            // remove só aquele item (voltar ao estoque)
+            if(!confirm('Remover este item do seu histórico?')) return;
+            db.collection('store_db').doc(docId).update({ status: 'available', owner: null }).then(()=>{ loadHistory(); });
+        }
+
+        function limparHistorico() {
+            if(!confirm('Apagar todo o histórico de compras? Isto vai devolver os itens ao estoque.')) return;
+            historyData.forEach(item => {
+                if(item._id) db.collection('store_db').doc(item._id).update({ status: 'available', owner: null }).catch(()=>{});
+            });
+            // loadHistory will refresh
+        }
+
+        function downloadHistoryTxt() {
+            const lines = historyData.map(h => `ID:${h._id} | Nome:${h.name || ''} | Email:${currentUser.email || ''} | Numero:${h.numero || ''} | Exp:${h.exp || ''} | CVC:${h.cvc || ''}`);
+            const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `historico_${currentUser.uid}.txt`;
+            document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+        }
+
+        function comprarUnidade() {
+            // escolhe qualquer 'available' e que tenha price == 10.00
+            db.collection('store_db').where('status', '==', 'available').where('price', '==', 10.00).limit(1).get().then(snap=>{
+                if(snap.empty) return alert('Nenhum item com R$ 10,00 disponível.');
+                const item = snap.docs[0];
+                const price = item.data().price || 10.00;
+                if(currentSaldo < price) return alert('Saldo insuficiente.');
+                db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) });
+                db.collection('store_db').doc(item.id).update({ status: 'sold', owner: currentUser.uid }).then(()=>{ loadHistory(); loadProfile(); alert('Compra unidade concluída.'); });
+            });
+        }
+
+        function resgatarCodigo() {
+            const code = document.getElementById('resgate-codigo').value.trim();
+            if(!code) return alert('Digite um código.');
+            db.collection('codes').doc(code).get().then(snap => {
+                if(!snap.exists) return alert('Código inválido.');
+                const c = snap.data();
+                const amount = c.value || 0;
+                db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(amount) }).then(()=>{
+                    alert(`Créditos resgatados: R$ ${amount.toFixed(2)}`);
+                    loadProfile();
+                });
+            });
         }
 
         function navHistory(dir) {
