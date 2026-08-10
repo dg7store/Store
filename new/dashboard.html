@@ -14,7 +14,6 @@
     <div class="user-background"></div>
     <div class="vignette-overlay"></div>
     
-    <!-- MODAL DE INFORMAÇÕES DO CARTÃO -->
     <div id="infoModal" class="info-modal">
         <div class="glass-panel">
             <h3 style="margin-bottom: 20px; font-size: 18px;">Detalhes do Cartão</h3>
@@ -23,7 +22,6 @@
         </div>
     </div>
 
-    <!-- MODAL DE ATUALIZAR FOTO DE PERFIL -->
     <div id="profileModal" class="info-modal">
         <div class="glass-panel">
             <h3 style="margin-bottom: 10px; font-size: 16px;">Atualizar Foto</h3>
@@ -59,10 +57,8 @@
                 <button id="tab-history" class="tab-button" onclick="selectTab('history')">Histórico</button>
             </div>
 
-            <!-- ABA 1: BUSCA E BOTÕES DINÂMICOS -->
             <div id="section-store" class="section-pane">
-                
-                <!-- BOTÕES GERADOS PELO ADMIN FICAM AQUI -->
+                <!-- Botões dinâmicos anti-fraude do Admin -->
                 <div id="dynamic-buttons-container" style="display:flex; flex-direction:column; gap:8px; margin-bottom: 20px;"></div>
 
                 <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 20px 0;">
@@ -77,7 +73,6 @@
                 </div>
             </div>
 
-            <!-- ABA 2: CARTEIRA -->
             <div id="section-balance" class="section-pane section-hidden">
                 <h3 style="margin-top: 10px; font-size: 14px;">Resgatar Código</h3>
                 <div class="flex-row">
@@ -86,7 +81,6 @@
                 </div>
             </div>
 
-            <!-- ABA 3: HISTÓRICO -->
             <div id="section-history" class="section-pane section-hidden">
                 <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin: 0; font-size: 14px;">Meus Cartões</h3>
@@ -95,14 +89,12 @@
                 
                 <p id="history-count" class="text-center" style="margin-bottom: 5px; font-size:12px; color: var(--primary-neon);">0 / 0</p>
                 
-                <!-- CARROSSEL -->
                 <div class="carousel-container">
                     <button id="nav-prev" class="carousel-btn" onclick="navHistory(-1)"><i class="ph-bold ph-caret-left"></i></button>
                     <div id="card-preview" class="cc-preview-card" onclick="copiarCartaoAtual()" title="Toque para copiar"></div>
                     <button id="nav-next" class="carousel-btn" onclick="navHistory(1)"><i class="ph-bold ph-caret-right"></i></button>
                 </div>
                 
-                <!-- LISTA GRID -->
                 <div id="history-list" class="history-list"></div>
             </div>
         </div>
@@ -128,7 +120,6 @@
             else { window.location.href = "index.html"; } 
         });
 
-        /* --- PERFIL E FOTO --- */
         function loadProfile() {
             db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
                 const data = doc.data();
@@ -152,15 +143,16 @@
             });
         }
 
-        /* --- BOTÕES DINÂMICOS DO ADMIN --- */
+        /* --- BOTÕES DINÂMICOS ANTI-FRAUDE --- */
         function loadDynamicButtons() {
             db.collection('store_buttons').orderBy('createdAt').onSnapshot(snap => {
                 const container = document.getElementById('dynamic-buttons-container');
                 container.innerHTML = '';
                 snap.forEach(doc => {
                     const b = doc.data();
+                    // Agora o HTML só envia o ID criptografado (doc.id), nada de preços no HTML.
                     container.innerHTML += `
-                        <button class="button-primary" style="margin: 0;" onclick="comprarPorBotao('${b.titulo}', '${b.regra}', '${b.valorRegra}', ${b.preco})">
+                        <button class="button-primary" style="margin: 0;" onclick="executarCompraSegura('${doc.id}')">
                             ${b.titulo} (R$ ${b.preco.toFixed(2)})
                         </button>
                     `;
@@ -168,31 +160,57 @@
             });
         }
 
-        function comprarPorBotao(titulo, regra, valor, preco) {
-            if(currentSaldo < preco) return alert('Saldo insuficiente. Recarregue sua carteira.');
+        // FUNÇÃO BLINDADA: Lê do servidor na hora H
+        async function executarCompraSegura(btnId) {
+            // Puxa as regras reais e o preço direto do DB (Impede fraude pelo F12)
+            const btnDoc = await db.collection('store_buttons').doc(btnId).get();
+            if(!btnDoc.exists) return alert("Erro: Botão não encontrado ou desativado.");
+            const btnData = btnDoc.data();
+            
+            if(currentSaldo < btnData.preco) return alert('Saldo insuficiente. Recarregue sua carteira.');
             
             let matches = storeCache;
-            const v = String(valor).toUpperCase();
+            const v = String(btnData.valorFiltro).toUpperCase();
             
-            if(regra === 'PAIS') matches = matches.filter(c => String(c.pais).toUpperCase().includes(v));
-            if(regra === 'CLASSE') matches = matches.filter(c => String(c.classe).toUpperCase().includes(v));
-            if(regra === 'BANDEIRA') matches = matches.filter(c => String(c.bandeira).toUpperCase() === v);
+            if(btnData.tipoFiltro === 'BIN') matches = matches.filter(c => String(c.bin || c.numero).startsWith(v));
+            if(btnData.tipoFiltro === 'PAIS') matches = matches.filter(c => String(c.pais).toUpperCase().includes(v));
+            if(btnData.tipoFiltro === 'CLASSE') matches = matches.filter(c => String(c.classe).toUpperCase().includes(v));
+            if(btnData.tipoFiltro === 'BANDEIRA') matches = matches.filter(c => String(c.bandeira).toUpperCase().includes(v));
             
-            if(matches.length === 0) return alert('Nenhum cartão no estoque bate com os requisitos deste botão no momento.');
+            if(matches.length < btnData.qtd) {
+                return alert(`ESTOQUE INSUFICIENTE!\nO pacote pede ${btnData.qtd}x [${btnData.tipoFiltro === 'MIX' ? 'Aleatórios' : v}]\nDisponíveis no estoque: ${matches.length}`);
+            }
             
-            if(!confirm(`Deseja comprar ${titulo} por R$ ${preco.toFixed(2)}?`)) return;
+            if(!confirm(`Confirmar compra: "${btnData.titulo}" por R$ ${btnData.preco.toFixed(2)}?\nVocê receberá ${btnData.qtd} cartão(ões).`)) return;
             
-            const item = matches[Math.floor(Math.random() * matches.length)];
-            const userCard = Object.assign({}, item, { boughtAt: firebase.firestore.FieldValue.serverTimestamp(), price: preco });
+            let cardsToBuy = [];
+            let tempCache = [...matches];
             
-            db.collection('users').doc(currentUser.uid).collection('cards').add(userCard)
-            .then(() => db.collection('store_db').doc(item.id).delete())
-            .then(() => db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-preco) }))
-            .then(() => {
-                currentHistoryIdx = 0;
-                alert('Compra Concluída com Sucesso! Cartão no seu histórico.');
-                selectTab('history');
+            for(let i=0; i<btnData.qtd; i++) {
+                const rIdx = Math.floor(Math.random() * tempCache.length);
+                cardsToBuy.push(tempCache[rIdx]);
+                tempCache.splice(rIdx, 1);
+            }
+
+            const batch = db.batch();
+            const precoUnitario = btnData.preco / btnData.qtd; // Registra o preço fatiado
+
+            cardsToBuy.forEach(item => {
+                const userCard = Object.assign({}, item, { boughtAt: firebase.firestore.FieldValue.serverTimestamp(), price: precoUnitario });
+                const userRef = db.collection('users').doc(currentUser.uid).collection('cards').doc();
+                batch.set(userRef, userCard);
+                const storeRef = db.collection('store_db').doc(item.id);
+                batch.delete(storeRef);
             });
+
+            const userBalRef = db.collection('users').doc(currentUser.uid);
+            batch.update(userBalRef, { saldo: firebase.firestore.FieldValue.increment(-btnData.preco) });
+
+            batch.commit().then(() => {
+                currentHistoryIdx = 0;
+                alert('Compra concluída! Verifique seu histórico.');
+                selectTab('history');
+            }).catch(e => alert('Erro crítico ao processar compra.'));
         }
 
         function selectTab(tab) {
@@ -213,7 +231,6 @@
 
         function safeText(value, fallback) { const text = String(value || '').trim(); return text || fallback; }
 
-        // BUSCA UNIVERSAL
         function buscarBinLive() {
             const input = document.getElementById('bin-search').value.trim();
             const container = document.getElementById('live-search-results');
@@ -282,7 +299,6 @@
             });
         }
 
-        // COMPRA MANUAL PELA PESQUISA
         function comprarManualBin(binPrefix, priceStr) {
             const price = parseFloat(priceStr);
             if (currentSaldo < price) return alert("Saldo Insuficiente! Requer R$ " + price.toFixed(2));
@@ -342,8 +358,8 @@
                 <div class="cc-number">${formatCardNumber(data.numero)}</div>
                 <div class="cc-name">${safeText(data.name, 'SEM NOME').toUpperCase()}</div>
                 <div class="cc-footer">
-                    <div><span>VALID</span><br><strong>${safeText(data.exp, '**/**')}</strong></div>
-                    <div><span>CVV</span><br><strong>${safeText(data.cvc, '***')}</strong></div>
+                    <div><span>VALID</span><strong>${safeText(data.exp, '**/**')}</strong></div>
+                    <div><span>CVV</span><strong>${safeText(data.cvc, '***')}</strong></div>
                 </div>
             `;
             count.innerText = `${currentHistoryIdx + 1} / ${historyData.length}`;
