@@ -9,24 +9,72 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 </head>
-<body>
-    <div class="container" id="login-box">
-        <h1>DG7STORE</h1>
-        <p class="text-center" style="font-size:12px;">ACESSO RESTRITO</p>
-        
-        <div style="margin: 20px 0; padding: 15px; background: rgba(255, 42, 42, 0.05); border: 1px dashed var(--secondary-neon); text-align: center;">
-            <p style="font-size: 10px; color: var(--secondary-neon);">DECIFRE (BASE64) PARA 6 NÚMEROS:</p>
-            <canvas id="captcha-canvas" width="280" height="48" style="display:block;margin:10px auto;" aria-hidden="true"></canvas>
-            <input type="text" id="captcha-input" placeholder="DIGITE OS 6 NÚMEROS" maxlength="6">
-        </div>
+<body class="text-white">
+    <div class="user-background"></div>
+    <div class="vignette-overlay"></div>
 
-        <input type="email" id="email" placeholder="Email">
-        <input type="password" id="password" placeholder="Senha">
-        <button onclick="login()">Entrar</button>
-        <button class="alt-btn" onclick="toggleRegister()">Criar Conta</button>
-        <p id="auth-msg" style="color: var(--secondary-neon); text-align: center; margin-top: 10px; font-size:12px;"></p>
+    <div class="page-shell">
+        <div class="glass-panel">
+            <div class="panel-header">
+                <div class="logo-font"><span class="text-silver">DG</span><span class="text-gold">7</span><span class="text-silver">STORE</span></div>
+                <p class="panel-subtitle">Acesso seguro para a loja principal. Complete a verificação antes de entrar.</p>
+            </div>
+
+            <p class="status-pill">Passo 1: Inicie a verificação de segurança.</p>
+
+            <form id="loginForm">
+                <div class="input-wrapper">
+                    <input type="email" id="email" class="input-glass" placeholder="Email" autocomplete="username">
+                </div>
+                <div class="input-wrapper">
+                    <input type="password" id="password" class="input-glass" placeholder="Senha" autocomplete="current-password">
+                </div>
+                <button type="button" id="verifyBtn" class="button-secondary">Iniciar Verificação</button>
+                <button type="submit" id="loginBtn" class="button-primary" disabled>Entrar</button>
+                <button type="button" id="registerBtn" class="button-secondary">Criar conta</button>
+                <p id="auth-msg" class="status-pill" style="margin-top: 12px; color: #ffb86c;"></p>
+            </form>
+        </div>
     </div>
 
+    <div id="securityModal" class="security-modal" aria-hidden="true">
+        <div class="security-panel">
+            <div id="phaseCaptcha" class="phase-panel">
+                <h3 class="terminal-text">Verificação necessária</h3>
+                <p class="timer-warning">Para acessar a loja, passe primeiro pelo reCAPTCHA e pelo desafio de sincronização.</p>
+                <div class="g-recaptcha" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" data-callback="onRecaptchaSuccess" data-theme="dark"></div>
+            </div>
+
+            <div id="phaseGame" class="phase-panel hidden">
+                <div class="terminal-text">Sincronize a chave criptográfica</div>
+                <div class="progress-text" id="progressText">Sincronizados: 0 / 6</div>
+
+                <div class="sync-container">
+                    <div class="number-box">
+                        <span class="number-label">ALVO</span>
+                        <div class="number-display target-box" id="targetNumber">-</div>
+                    </div>
+                    <div class="number-box">
+                        <span class="number-label">SISTEMA</span>
+                        <div class="number-display system-box" id="systemNumber">-</div>
+                    </div>
+                </div>
+
+                <button id="captureBtn" class="capture-btn">SINCRONIZAR</button>
+                <div class="timer-warning">O número muda a cada 5 segundos.</div>
+                <div class="chances-text" id="chancesDisplay">Chances restantes: 7</div>
+                <button id="cancelGameBtn" class="button-secondary" style="margin-top: 10px;">Cancelar</button>
+            </div>
+
+            <div id="lockoutScreen" class="hidden">
+                <div class="terminal-text" style="color:#ff6e6e;">ACESSO BLOQUEADO</div>
+                <div class="timer-text" id="lockoutTimerDisplay">05:00</div>
+                <p class="timer-warning">Bloqueio temporário ativado após 7 tentativas erradas.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
     <script>
         const firebaseConfig = {
@@ -37,112 +85,271 @@
             messagingSenderId: "118364909075",
             appId: "1:118364909075:web:e861cc89702144e62d99e6"
         };
-        try {
-            if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
-            var auth = firebase.auth();
-            var db = firebase.firestore();
-        } catch (e) {
-            document.getElementById('auth-msg').innerText = 'Erro de conexão com Firebase. Verifique console e configurações de domínio no Firebase.';
-            console.error('Firebase init error:', e);
-        }
 
-        // Helpful network check
+        if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
+        const verifyBtn = document.getElementById('verifyBtn');
+        const authMsg = document.getElementById('auth-msg');
+
+        const modal = document.getElementById('securityModal');
+        const phaseCaptcha = document.getElementById('phaseCaptcha');
+        const phaseGame = document.getElementById('phaseGame');
+        const lockoutScreen = document.getElementById('lockoutScreen');
+        const targetNumberUI = document.getElementById('targetNumber');
+        const systemNumberUI = document.getElementById('systemNumber');
+        const progressTextUI = document.getElementById('progressText');
+        const chancesDisplay = document.getElementById('chancesDisplay');
+
+        const MAX_CHANCES = 7;
+        const LOCKOUT_DURATION_MS = 5 * 60 * 1000;
+        const INACTIVITY_LIMIT_MS = 40000;
+        const ROULETTE_SPEED_MS = 5000;
+
+        let chances = parseInt(localStorage.getItem('dg7_chances')) || MAX_CHANCES;
+        let isHumanVerified = false;
+        let targetSequence = [];
+        let currentIndex = 0;
+        let currentDisplayNumber = -1;
+        let rouletteInterval;
+        let inactivityTimeout;
+        let spinCount = 0;
+
+        window.startMiniGame = startMiniGame;
+
         function isOnline() { return navigator.onLine; }
-    </script>
 
-    <script>
-        let currentCaptcha = "";
+        function showMessage(text, color = '#ffb86c') {
+            authMsg.innerText = text;
+            authMsg.style.color = color;
+        }
 
-        // Render the base64 captcha into a canvas so it cannot be copied as text
-        const canvas = document.getElementById('captcha-canvas');
-        const ctx = canvas.getContext('2d');
-
-        function renderCaptchaBase64(text) {
-            // clear
-            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg') || '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            // draw noisy background
-            for (let i=0;i<30;i++){
-                ctx.fillStyle = 'rgba(255,255,255,' + (Math.random()*0.06+0.02) + ')';
-                ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, Math.random()*6, Math.random()*6);
+        function openSecurityCheck() {
+            if (isHumanVerified) {
+                showMessage('Verificação já concluída.', '#8ff4b5');
+                return;
             }
-            ctx.font = '18px monospace';
-            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--secondary-neon') || '#0ff';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(text, 10, canvas.height/2);
+            modal.classList.add('active');
+            phaseCaptcha.classList.remove('hidden');
+            phaseGame.classList.add('hidden');
+            lockoutScreen.classList.add('hidden');
+            modal.setAttribute('aria-hidden', 'false');
         }
 
-        function generateCaptcha() {
-            const num = Math.floor(100000 + Math.random() * 900000).toString();
-            currentCaptcha = num;
-            const b = btoa(num);
-            renderCaptchaBase64(b);
+        function onRecaptchaSuccess(token) {
+            setTimeout(() => {
+                if (phaseCaptcha) phaseCaptcha.classList.add('hidden');
+                startMiniGame();
+            }, 600);
         }
-        generateCaptcha();
 
-        function verifyCaptcha() {
-            const input = document.getElementById('captcha-input').value;
-            if(input !== currentCaptcha) {
-                document.getElementById('auth-msg').innerText = "Falha na verificação de segurança.";
-                generateCaptcha();
-                return false;
+        function startMiniGame() {
+            phaseGame.classList.remove('hidden');
+            phaseGame.classList.add('flex');
+            chancesDisplay.innerText = `Chances restantes: ${chances}`;
+            generateSequence();
+            currentIndex = 0;
+            updateGameUI();
+            startRoulette();
+            resetInactivityTimer();
+        }
+
+        function generateSequence() {
+            targetSequence = [];
+            for (let i = 0; i < 6; i++) {
+                targetSequence.push(Math.floor(Math.random() * 10));
             }
-            return true;
         }
 
-        // Prevent copying/pasting of the captcha
-        canvas.addEventListener('copy', e => e.preventDefault());
-        canvas.addEventListener('contextmenu', e => e.preventDefault());
-        const captchaInput = document.getElementById('captcha-input');
-        captchaInput.addEventListener('paste', e => { e.preventDefault(); document.getElementById('auth-msg').innerText = 'Colar não permitido no captcha.'; });
-        // Prevent selecting the canvas
-        canvas.style.userSelect = 'none';
-        canvas.setAttribute('aria-label','Captcha base64 (não selecionável)');
+        function updateGameUI() {
+            targetNumberUI.innerText = targetSequence[currentIndex];
+            progressTextUI.innerText = `Sincronizados: ${currentIndex} / 6`;
+        }
 
-        function login() {
-            if(!verifyCaptcha()) return;
-            if (!isOnline()) { document.getElementById('auth-msg').innerText = 'Sem conexão de rede.'; return; }
-            const e = document.getElementById('email').value;
-            const p = document.getElementById('password').value;
-            auth.signInWithEmailAndPassword(e, p).then(() => {
-                window.location.href = "dashboard.html";
+        function startRoulette() {
+            clearInterval(rouletteInterval);
+            spinCount = 0;
+            spinRoulette();
+            rouletteInterval = setInterval(spinRoulette, ROULETTE_SPEED_MS);
+        }
+
+        function spinRoulette() {
+            spinCount++;
+            if (spinCount >= 2 || Math.random() < 0.22) {
+                currentDisplayNumber = targetSequence[currentIndex];
+                spinCount = 0;
+            } else {
+                let tempNum;
+                do {
+                    tempNum = Math.floor(Math.random() * 10);
+                } while (tempNum === targetSequence[currentIndex]);
+                currentDisplayNumber = tempNum;
+            }
+            systemNumberUI.innerText = currentDisplayNumber;
+            systemNumberUI.classList.remove('flash');
+            void systemNumberUI.offsetWidth;
+            systemNumberUI.classList.add('flash');
+        }
+
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimeout);
+            inactivityTimeout = setTimeout(() => handleGameError(true), INACTIVITY_LIMIT_MS);
+        }
+
+        function handleGameError(isTimeout) {
+            chances = Math.max(0, chances - 1);
+            localStorage.setItem('dg7_chances', chances);
+            chancesDisplay.innerText = `Chances restantes: ${chances}`;
+            phaseGame.classList.add('shake');
+            setTimeout(() => phaseGame.classList.remove('shake'), 400);
+            if (checkLockout()) return;
+            if (isTimeout) {
+                systemNumberUI.innerText = '!';
+                systemNumberUI.style.color = '#ff4444';
+                setTimeout(() => { systemNumberUI.style.color = ''; }, 1000);
+            }
+            currentIndex = 0;
+            generateSequence();
+            updateGameUI();
+            startRoulette();
+            resetInactivityTimer();
+        }
+
+        function checkLockout() {
+            const lockoutEnd = localStorage.getItem('dg7_lockout_end');
+            const now = Date.now();
+            if (lockoutEnd && now < parseInt(lockoutEnd, 10)) {
+                triggerLockout(parseInt(lockoutEnd, 10));
+                return true;
+            }
+            if (chances <= 0) {
+                const newEnd = Date.now() + LOCKOUT_DURATION_MS;
+                localStorage.setItem('dg7_lockout_end', newEnd);
+                triggerLockout(newEnd);
+                return true;
+            }
+            if (lockoutEnd && now >= parseInt(lockoutEnd, 10)) {
+                localStorage.removeItem('dg7_lockout_end');
+                localStorage.setItem('dg7_chances', MAX_CHANCES);
+                chances = MAX_CHANCES;
+            }
+            return false;
+        }
+
+        function triggerLockout(endTime) {
+            phaseCaptcha.classList.add('hidden');
+            phaseGame.classList.add('hidden');
+            lockoutScreen.classList.remove('hidden');
+            lockoutScreen.classList.add('active');
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            document.getElementById('lockoutTimerDisplay').innerText = formatTimer(endTime - Date.now());
+            const interval = setInterval(() => {
+                const diff = endTime - Date.now();
+                if (diff <= 0) {
+                    clearInterval(interval);
+                    location.reload();
+                } else {
+                    document.getElementById('lockoutTimerDisplay').innerText = formatTimer(diff);
+                }
+            }, 1000);
+        }
+
+        function formatTimer(ms) {
+            const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function handleSuccess() {
+            clearInterval(rouletteInterval);
+            clearTimeout(inactivityTimeout);
+            isHumanVerified = true;
+            chances = MAX_CHANCES;
+            localStorage.setItem('dg7_chances', MAX_CHANCES);
+            loginBtn.disabled = false;
+            registerBtn.disabled = false;
+            showMessage('Verificação concluída! Agora entre ou crie sua conta.', '#8ff4b5');
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        verifyBtn.addEventListener('click', openSecurityCheck);
+        document.getElementById('captureBtn').addEventListener('click', () => {
+            if (currentDisplayNumber === targetSequence[currentIndex]) {
+                currentIndex++;
+                if (currentIndex >= targetSequence.length) {
+                    handleSuccess();
+                    return;
+                }
+                updateGameUI();
+                startRoulette();
+                resetInactivityTimer();
+            } else {
+                handleGameError(false);
+            }
+        });
+
+        document.getElementById('cancelGameBtn').addEventListener('click', () => {
+            clearInterval(rouletteInterval);
+            clearTimeout(inactivityTimeout);
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+            if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (!isHumanVerified) {
+                showMessage('Você precisa passar pela verificação primeiro.', '#ff6e6e');
+                return;
+            }
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+            if (!email || !password) {
+                showMessage('Preencha email e senha.', '#ff6e6e');
+                return;
+            }
+            auth.signInWithEmailAndPassword(email, password).then(() => {
+                window.location.href = 'dashboard.html';
             }).catch(err => {
                 console.error('Login error', err);
-                if (err && err.code === 'auth/network-request-failed') {
-                    document.getElementById('auth-msg').innerText = 'Erro de conexão com o Firebase. Verifique internet e domínios autorizados no console Firebase.';
-                } else {
-                    document.getElementById('auth-msg').innerText = err.message || 'Erro ao autenticar.';
-                }
+                showMessage(err.message || 'Erro ao autenticar.', '#ff6e6e');
             });
-        }
+        });
 
-        function toggleRegister() {
-            if(!verifyCaptcha()) return;
-            if (!isOnline()) { document.getElementById('auth-msg').innerText = 'Sem conexão de rede.'; return; }
-            const e = document.getElementById('email').value;
-            const p = document.getElementById('password').value;
-            auth.createUserWithEmailAndPassword(e, p).then((cred) => {
-                db.collection('users').doc(cred.user.uid).set({
-                    email: e,
+        registerBtn.addEventListener('click', () => {
+            if (!isHumanVerified) {
+                showMessage('Complete a verificação antes de criar conta.', '#ff6e6e');
+                return;
+            }
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+            if (!email || !password) {
+                showMessage('Preencha email e senha para criar a conta.', '#ff6e6e');
+                return;
+            }
+            auth.createUserWithEmailAndPassword(email, password).then(cred => {
+                return db.collection('users').doc(cred.user.uid).set({
+                    email,
                     saldo: 0.00,
-                    avatarUrl: "",
-                    jsonbinKey: "",
-                    jsonbinId: ""
-                }).then(() => {
-                    window.location.href = "dashboard.html";
-                }).catch(err => {
-                    console.error('DB save error', err);
-                    document.getElementById('auth-msg').innerText = 'Conta criada, mas falha ao salvar perfil.';
+                    avatarUrl: '',
+                    jsonbinKey: '',
+                    jsonbinId: ''
                 });
+            }).then(() => {
+                window.location.href = 'dashboard.html';
             }).catch(err => {
                 console.error('Register error', err);
-                if (err && err.code === 'auth/network-request-failed') {
-                    document.getElementById('auth-msg').innerText = 'Erro de conexão com o Firebase. Verifique internet e domínios autorizados no console Firebase.';
-                } else {
-                    document.getElementById('auth-msg').innerText = err.message || 'Erro ao criar conta.';
-                }
+                showMessage(err.message || 'Erro ao criar conta.', '#ff6e6e');
             });
-        }
+        });
     </script>
 </body>
 </html>
