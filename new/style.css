@@ -1,9 +1,9 @@
 :root {
-    --bg-color: #030604; /* Deep tactical dark green/black */
-    --panel-bg: rgba(6, 15, 8, 0.85); /* Slightly transparent for grid */
-    --primary-neon: #00ff55; /* Hacker CRT green */
-    --secondary-neon: #ff2a2a; /* Defense Alert Red */
-    --text-main: #9cbda6; /* Muted terminal text */
+    --bg-color: #030604;
+    --panel-bg: rgba(6, 15, 8, 0.85);
+    --primary-neon: #00ff55;
+    --secondary-neon: #ff2a2a;
+    --text-main: #9cbda6;
     --border-color: #0f3319;
 }
 
@@ -11,8 +11,8 @@
     box-sizing: border-box; 
     margin: 0; 
     padding: 0; 
-    font-family: 'Courier New', Courier, monospace; /* Hacker aesthetic */
-    text-transform: uppercase; /* Military standard */
+    font-family: 'Courier New', Courier, monospace;
+    text-transform: uppercase;
 }
 
 body { 
@@ -22,13 +22,12 @@ body {
     flex-direction: column; 
     align-items: center; 
     min-height: 100vh; 
-    padding: 10px; /* Reduced for mobile */
-    /* Tactical radar/grid background */
+    padding: 10px;
     background-image:
         linear-gradient(rgba(0, 255, 85, 0.04) 1px, transparent 1px),
         linear-gradient(90deg, rgba(0, 255, 85, 0.04) 1px, transparent 1px);
     background-size: 25px 25px;
-    -webkit-tap-highlight-color: transparent; /* Remove o piscar azul nativo do Android ao tocar */
+    -webkit-tap-highlight-color: transparent;
 }
 
 h1, h2, h3 { 
@@ -41,15 +40,14 @@ h1, h2, h3 {
     letter-spacing: 2px;
 }
 
-/* Mobile optimized container */
 .container { 
     background-color: var(--panel-bg); 
     padding: 25px 15px 15px 15px; 
     border: 1px solid var(--border-color);
-    border-top: 4px solid var(--primary-neon); /* Accent top */
+    border-top: 4px solid var(--primary-neon);
     box-shadow: 0 5px 20px rgba(0,0,0,0.8); 
     width: 100%; 
-    max-width: 100%; /* Fills Android screen */
+    max-width: 100%;
     margin-bottom: 15px; 
     position: relative;
 }
@@ -70,12 +68,12 @@ input, button, textarea {
     width: 100%; 
     padding: 14px; 
     margin: 8px 0; 
-    border-radius: 0; /* Sharp tactical edges */
+    border-radius: 0;
     border: 1px solid var(--border-color); 
     background: rgba(0, 0, 0, 0.6); 
     color: var(--primary-neon); 
     outline: none; 
-    font-size: 16px; /* Prevents auto-zoom on mobile */
+    font-size: 16px;
 }
 
 textarea { resize: vertical; }
@@ -106,9 +104,9 @@ button:active {
     display: flex; 
     justify-content: space-between; 
     gap: 8px; 
-    flex-wrap: wrap; /* Allows wrapping on very small screens */
+    flex-wrap: wrap;
 }
-.flex-row > * { flex: 1 1 auto; min-width: 100px; } /* Flexible children */
+.flex-row > * { flex: 1 1 auto; min-width: 100px; }
 
 select { 
     padding: 12px; 
@@ -146,7 +144,7 @@ select:focus { border-color: var(--primary-neon); }
 }
 
 .tab-button {
-    flex: 1 1 30%; /* Ajustado para caber 3 abas uniformemente */
+    flex: 1 1 30%;
     padding: 12px 10px;
     border: 1px solid rgba(255,255,255,0.12);
     background: rgba(255,255,255,0.05);
@@ -169,22 +167,61 @@ select:focus { border-color: var(--primary-neon); }
 .section-pane { display: block; }
 .section-hidden { display: none; }
 
-/* Responsive Android Visual CC */
+/* Carrossel de Preview com Setas Laterais */
+.carousel-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    margin: 10px 0 20px;
+}
+
+.carousel-btn {
+    background: rgba(0, 255, 85, 0.1);
+    border: 1px solid var(--primary-neon);
+    color: var(--primary-neon);
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    padding: 0;
+    margin: 0;
+}
+.carousel-btn:disabled {
+    border-color: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.2);
+    background: transparent;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+.carousel-btn:active:not(:disabled) {
+    background: var(--primary-neon);
+    color: #000;
+    transform: scale(0.9);
+}
+
 .cc-preview-card {
     position: relative;
-    width: 100%;
-    max-width: 360px;
+    flex: 1;
+    max-width: 320px;
     aspect-ratio: 1.6;
     background: linear-gradient(135deg, #111, #2b2b2b 50%, #111 100%);
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 20px;
-    margin: 10px auto 20px;
     padding: 18px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     box-shadow: 0 0 22px rgba(0,0,0,0.8);
     cursor: pointer;
+    margin: 0;
 }
 .cc-preview-card::before {
     content: '';
@@ -202,7 +239,7 @@ select:focus { border-color: var(--primary-neon); }
 .cc-footer { display:flex; justify-content:space-between; gap: 12px; margin-top: 12px; color: #dce9dc; font-size: 10px; }
 .cc-footer span { display:block; color: rgba(255,255,255,0.65); margin-bottom: 4px; }
 .cc-hint { font-size: 10px; color: rgba(255,255,255,0.7); text-align: right; margin-top: 8px; }
-.cc-empty { display:flex; align-items:center; justify-content:center; height:100%; color:#ccffcc; font-size:12px; }
+.cc-empty { display:flex; align-items:center; justify-content:center; height:100%; color:#ccffcc; font-size:12px; text-align: center;}
 
 /* Grid History List para 2 colunas */
 .history-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
@@ -227,10 +264,6 @@ select:focus { border-color: var(--primary-neon); }
 .card-actions { display:flex; gap:8px; }
 .card-body { font-size: 9px; color: var(--text-main); margin-top:6px; line-height: 1.4; }
 
-.nav-arrows { display: flex; justify-content: space-between; width: 100%; max-width: 360px; margin: 0 auto; gap: 10px; }
-.nav-arrows button { width: 100%; margin: 0; padding: 12px; font-size: 14px; }
-.nav-arrows button:disabled { opacity: 0.45; cursor:not-allowed; }
-
 .button-danger { background: linear-gradient(90deg,#ff6b6b,#ff2a2a); color:#100; border: none; padding: 8px 12px; border-radius: 8px; cursor:pointer; font-weight: bold;}
 .button-danger:active { transform: translateY(0); box-shadow: none; background: #ff0000; }
 .button-primary { background: linear-gradient(90deg, #00ff55, #2ddc86); color: #061607; border: none; padding: 8px 12px; border-radius: 8px; }
@@ -242,7 +275,7 @@ select:focus { border-color: var(--primary-neon); }
     padding: 20px 10px 40px;
     display: flex;
     justify-content: center;
-    align-items: flex-start; /* Evita que o teclado do Android empurre tudo pra fora */
+    align-items: flex-start;
     overflow-x: hidden;
 }
 .user-background {
@@ -266,7 +299,7 @@ select:focus { border-color: var(--primary-neon); }
     border: 1px solid rgba(0, 255, 85, 0.12);
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(14px);
-    padding: 20px 15px; /* Reduzido para encaixar melhor no mobile */
+    padding: 20px 15px; 
     border-radius: 28px;
     width: 100%;
     max-width: 520px;
@@ -280,7 +313,30 @@ select:focus { border-color: var(--primary-neon); }
 .button-primary { background: linear-gradient(90deg, #00ff55, #2ddc86); color: #061607; border: 1px solid transparent; box-shadow: 0 14px 30px rgba(0, 255, 85, 0.12); }
 .button-secondary { background: rgba(255,255,255,0.06); color: #d7ffd9; border: 1px solid rgba(255,255,255,0.15); }
 .button-secondary:hover, .button-primary:hover, .capture-btn:hover { transform: translateY(-1px); }
-.input-wrapper { position: relative; margin-bottom: 18px; }
-.input-glass { width: 100%; border: none; border-bottom: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: #e8ffe8; padding: 14px; font-size: 0.95rem; }
-.input-glass::placeholder { color: rgba(255,255,255,0.42); }
-.input-glass:focus { outline: none; border-bottom-color: #00ff55; box-shadow: inset 0 0 12px rgba(0,255,85,0.12); }
+
+/* --- GTA SAN ANDREAS HUD --- */
+.gta-hud {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+.gta-hud img {
+    width: 55px;
+    height: 55px;
+    border-radius: 50%;
+    border: 2px solid #000;
+    object-fit: cover;
+    margin-bottom: -5px;
+    filter: contrast(1.1) brightness(0.9);
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.8);
+    z-index: 2;
+}
+.gta-money {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: 26px;
+    color: #447b44; 
+    -webkit-text-stroke: 1.5px black;
+    text-shadow: 2px 2px 0 #000;
+    letter-spacing: 2px;
+    z-index: 1;
+}
