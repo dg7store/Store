@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DG7STORE - Painel</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+</head>
+<body class="text-white">
+    <div class="user-background"></div>
+    <div class="vignette-overlay"></div>
+    <div class="page-shell">
+        <div class="glass-panel" style="padding: 20px 15px;">
+            <div class="panel-header" style="margin-bottom: 15px;">
+                <div class="logo-font"><span class="text-silver">DG</span><span class="text-gold">7</span><span class="text-silver">STORE</span></div>
+            </div>
+            <div class="flex-row" style="align-items:center; margin-bottom: 20px; gap: 12px; justify-content: space-between;">
+                <div class="saldo-box" style="margin: 0; padding: 10px; font-size: 18px; flex: 1;">R$ <span id="saldo-display">0.00</span></div>
+                <button class="button-secondary" onclick="logout()" style="width:auto; padding: 10px 18px; margin: 0;">Sair</button>
+            </div>
+
+            <!-- Abas com a Busca (Store) como inicial -->
+            <div class="menu-tabs" style="margin: 10px 0;">
+                <button id="tab-store" class="tab-button tab-active" onclick="selectTab('store')">Busca</button>
+                <button id="tab-balance" class="tab-button" onclick="selectTab('balance')">Carteira</button>
+                <button id="tab-history" class="tab-button" onclick="selectTab('history')">Histórico</button>
+            </div>
+
+            <!-- ABA 1: BUSCA BIN -->
+            <div id="section-store" class="section-pane">
+                <div class="flex-row" style="gap: 6px;">
+                    <input type="number" id="bin-search" placeholder="Buscar BIN (6 dígitos)" maxlength="6">
+                    <select id="filter-bandeira">
+                        <option value="">Todas bandeiras</option>
+                        <option value="VISA">Visa</option>
+                        <option value="MASTERCARD">Mastercard</option>
+                        <option value="ELO">Elo</option>
+                        <option value="AMEX">Amex</option>
+                    </select>
+                    <select id="filter-classe">
+                        <option value="">Todas classes</option>
+                        <option value="PREPAID">Prepaid</option>
+                        <option value="CLASSIC">Classic</option>
+                        <option value="STANDARD">Standard</option>
+                        <option value="CREDITO">Crédito</option>
+                        <option value="DEBITO">Débito</option>
+                    </select>
+                    <button class="button-secondary" onclick="buscarBin()" style="flex: 1 1 100%;">Pesquisar</button>
+                </div>
+                <p id="bin-result" style="text-align: center; margin-top: 10px; color: var(--primary-neon); font-size:12px;"></p>
+                <button id="btn-comprar" class="hidden button-primary" onclick="comprar()">Confirmar Compra</button>
+            </div>
+
+            <!-- ABA 2: CARTEIRA -->
+            <div id="section-balance" class="section-pane section-hidden">
+                <h3 style="margin-top: 10px; font-size: 14px;">Resgatar Código</h3>
+                <div class="flex-row">
+                    <input type="text" id="resgate-codigo" placeholder="Código">
+                    <button class="button-secondary" onclick="resgatarCodigo()" style="width: auto;">Resgatar</button>
+                </div>
+                <h3 style="margin-top: 15px; font-size: 14px;">Unidade Aleatória</h3>
+                <button id="btn-unidade" class="button-secondary" onclick="comprarUnidade()">Comprar (R$ 10,00)</button>
+                <p id="random-buy-result" style="margin-top: 10px; font-size: 12px; text-align: center; color: var(--text-main);"></p>
+            </div>
+
+            <!-- ABA 3: HISTÓRICO -->
+            <div id="section-history" class="section-pane section-hidden">
+                <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin: 0; font-size: 14px;">Meus Cartões</h3>
+                    <button class="button-danger" onclick="limparHistorico()" style="width: auto; padding: 6px 10px; font-size: 10px; margin: 0;">Excluir Todos</button>
+                </div>
+                
+                <div id="card-preview" class="cc-preview-card" onclick="copiarCartaoAtual()" title="Toque para copiar"></div>
+                <p id="history-count" class="text-center" style="margin-bottom: 10px; font-size:12px;">0 / 0</p>
+                
+                <!-- GRID 2 COLUNAS -->
+                <div id="history-list" class="history-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;"></div>
+                
+                <div class="nav-arrows">
+                    <button id="nav-prev" class="button-secondary" onclick="navHistory(-1)">◄</button>
+                    <button id="nav-next" class="button-secondary" onclick="navHistory(1)">►</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyAt7cAOc3I02wg31EHq39aQigYY_CyxtkY", authDomain: "dg7store-c9636.firebaseapp.com", projectId: "dg7store-c9636", storageBucket: "dg7store-c9636.firebasestorage.app", messagingSenderId: "118364909075", appId: "1:118364909075:web:e861cc89702144e62d99e6" };
+        if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let currentUser = null; let currentSaldo = 0; let historyData = []; let currentHistoryIdx = 0;
+        let currentBinQuery = ""; let currentBinPrice = 0;
+
+        auth.onAuthStateChanged(user => { if (user) { currentUser = user; loadProfile(); loadHistory(); } else { window.location.href = "index.html"; } });
+
+        function loadProfile() {
+            db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
+                const data = doc.data();
+                currentSaldo = data.saldo || 0;
+                document.getElementById('saldo-display').innerText = currentSaldo.toFixed(2);
+            });
+        }
+
+        function selectTab(tab) {
+            document.getElementById('tab-store').classList.toggle('tab-active', tab === 'store');
+            document.getElementById('tab-balance').classList.toggle('tab-active', tab === 'balance');
+            document.getElementById('tab-history').classList.toggle('tab-active', tab === 'history');
+            document.getElementById('section-store').classList.toggle('section-hidden', tab !== 'store');
+            document.getElementById('section-balance').classList.toggle('section-hidden', tab !== 'balance');
+            document.getElementById('section-history').classList.toggle('section-hidden', tab !== 'history');
+        }
+
+        function formatCardNumber(value) {
+            const digits = String(value || '').replace(/\D/g, '').slice(0, 16);
+            if (!digits) return '**** **** **** ****';
+            const groups = []; for (let i = 0; i < digits.length; i += 4) groups.push(digits.slice(i, i + 4));
+            return groups.join(' ');
+        }
+
+        function safeText(value, fallback) { const text = String(value || '').trim(); return text || fallback; }
+
+        async function lookupBinMetadata(bin) {
+            if (!/^\d{6}$/.test(bin)) return null;
+            try { const response = await fetch(`https://lookup.binlist.net/${bin}`, { headers: { Accept: 'application/json' } }); if (!response.ok) throw new Error('offline'); return await response.json(); } catch (e) { return null; }
+        }
+
+        async function buscarBin() {
+            const input = document.getElementById('bin-search').value.trim();
+            const classeSelect = document.getElementById('filter-classe');
+            const bandeiraSelect = document.getElementById('filter-bandeira');
+            const binResult = document.getElementById('bin-result');
+            const btnComprar = document.getElementById('btn-comprar');
+
+            binResult.innerText = 'Pesquisando...'; btnComprar.classList.add('hidden');
+
+            if (!input || (!/^\d{1,6}$/.test(input) && !/[a-z]/i.test(input))) { binResult.innerText = 'Digite um BIN válido.'; return; }
+            if (!/^\d{1,6}$/.test(input)) { binResult.innerText = 'Nenhuma sugestão encontrada.'; return; }
+
+            const bin = input.padEnd(6, '0').slice(0, 6);
+            
+            // Não alteramos mais o select do usuário baseando-se no BIN. Ele pesquisa o que ele escolheu.
+            const classe = classeSelect.value;
+            const bandeira = bandeiraSelect.value;
+
+            try {
+                const snap = await db.collection('store_db').where('status', '==', 'available').get();
+                const matches = snap.docs.filter(doc => {
+                    const data = doc.data() || {};
+                    const number = String(data.numero || '').replace(/\D/g, '');
+                    const docBin = String(data.bin || data.bin_prefix || '').replace(/\D/g, '').slice(0, 6);
+                    const matchesBin = docBin.startsWith(bin) || number.startsWith(bin);
+                    const matchesClasse = !classe || String(data.classe || '').toUpperCase() === classe.toUpperCase();
+                    const matchesBandeira = !bandeira || String(data.bandeira || '').toUpperCase() === bandeira.toUpperCase();
+                    return matchesBin && matchesClasse && matchesBandeira;
+                });
+
+                if (!matches.length) { binResult.innerText = `BIN ${bin} • Estoque: 0`; return; }
+
+                const prices = matches.map(d => d.data().price || 0);
+                currentBinPrice = prices.length ? Math.min(...prices) : 0;
+                binResult.innerText = `BIN ${bin} • Estoque: ${matches.length} un. | Valor: R$ ${currentBinPrice.toFixed(2)}`;
+                btnComprar.classList.remove('hidden'); currentBinQuery = bin;
+            } catch (err) { binResult.innerText = 'Erro ao buscar.'; }
+        }
+
+        function comprar() {
+            if (currentSaldo < currentBinPrice) return alert("Saldo Insuficiente!");
+            db.collection('store_db').where('status', '==', 'available').limit(50).get().then(snapAll => {
+                const match = snapAll.docs.find(d => { const data = d.data(); const numero = data.numero || ''; return numero.startsWith(currentBinQuery) || (data.bin && data.bin === currentBinQuery); });
+                if (!match) return alert('Nenhum item disponível para esta busca.');
+                const itemId = match.id; const itemData = match.data(); const price = itemData.price || currentBinPrice;
+                const userCard = Object.assign({}, itemData, { boughtAt: firebase.firestore.FieldValue.serverTimestamp() });
+                db.collection('users').doc(currentUser.uid).collection('cards').add(userCard).then(() => db.collection('store_db').doc(itemId).delete()).then(() => db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) })).then(() => {
+                    alert('Compra Concluída!'); buscarBin(); loadProfile(); loadHistory();
+                }).catch(err => { alert('Erro na compra.'); });
+            });
+        }
+
+        function loadHistory() {
+            db.collection('users').doc(currentUser.uid).collection('cards').orderBy('boughtAt', 'desc').onSnapshot(snap => {
+                historyData = [];
+                snap.forEach(doc => { const d = doc.data(); d._id = doc.id; if (!d.name || d.name.trim() === '') { d.name = "NOME DESCONHECIDO"; } historyData.push(d); });
+                currentHistoryIdx = 0; renderHistoryList(); renderPreviewCard();
+            });
+        }
+
+        function renderPreviewCard() {
+            const preview = document.getElementById('card-preview'); const count = document.getElementById('history-count');
+            const prevBtn = document.getElementById('nav-prev'); const nextBtn = document.getElementById('nav-next');
+            if (!preview) return;
+            if (historyData.length === 0) { preview.innerHTML = '<div class="cc-empty">Nenhum cartão comprado ainda.</div>'; count.innerText = '0 / 0'; prevBtn.disabled = true; nextBtn.disabled = true; return; }
+            const data = historyData[currentHistoryIdx];
+            preview.innerHTML = `
+                <div class="cc-top"><div class="cc-chip"></div><div class="cc-brand">${safeText(data.classe, 'CARD').toUpperCase()}</div></div>
+                <div class="cc-number">${formatCardNumber(data.numero)}</div>
+                <div class="cc-name">${safeText(data.name, 'SEM NOME').toUpperCase()}</div>
+                <div class="cc-footer"><div><span>VALID</span><strong>${safeText(data.exp, '**/**')}</strong></div><div><span>CVV</span><strong>${safeText(data.cvc, '***')}</strong></div></div>
+                <div class="cc-hint">Toque para copiar</div>
+            `;
+            count.innerText = `${currentHistoryIdx + 1} / ${historyData.length}`;
+            prevBtn.disabled = historyData.length <= 1 || currentHistoryIdx >= historyData.length - 1;
+            nextBtn.disabled = historyData.length <= 1 || currentHistoryIdx <= 0;
+        }
+
+        function renderHistoryList() {
+            const list = document.getElementById('history-list'); list.innerHTML = '';
+            historyData.forEach((d, idx) => {
+                const card = document.createElement('div');
+                card.className = `history-card${idx === currentHistoryIdx ? ' active' : ''}`;
+                card.style.cursor = 'pointer';
+                card.innerHTML = `
+                    <div class="card-top" style="margin-bottom: 4px;">
+                        <div class="card-num" style="font-size: 10px;">${formatCardNumber(d.numero)}</div>
+                        <button onclick="event.stopPropagation(); apagarCompra('${d._id}')" class="button-danger" style="padding: 2px 6px; font-size: 10px; border-radius: 4px; margin: 0;">X</button>
+                    </div>
+                    <div class="card-body" style="font-size: 9px; margin-top:0;">
+                        <span style="color: #fff;">${safeText(d.classe, 'CARD').toUpperCase()}</span><br>
+                        VAL: ${safeText(d.exp, '**/**')}
+                    </div>
+                `;
+                card.onclick = () => { currentHistoryIdx = idx; renderHistoryList(); renderPreviewCard(); };
+                list.appendChild(card);
+            });
+        }
+
+        function apagarCompra(docId) {
+            if(!confirm('Remover este item?')) return;
+            db.collection('users').doc(currentUser.uid).collection('cards').doc(docId).delete();
+        }
+
+        function limparHistorico() {
+            if(!confirm('Apagar todo o histórico de compras?')) return;
+            const batch = db.batch();
+            historyData.forEach(item => { const ref = db.collection('users').doc(currentUser.uid).collection('cards').doc(item._id); batch.delete(ref); });
+            batch.commit();
+        }
+
+        function copiarCartaoAtual() {
+            if (!historyData.length) return; const data = historyData[currentHistoryIdx];
+            const text = `Número: ${data.numero || ''}\nExp: ${data.exp || ''}\nCVC: ${data.cvc || ''}\nBIN: ${data.bin || ''}`;
+            navigator.clipboard.writeText(text).then(() => {
+                const preview = document.getElementById('card-preview'); preview.classList.add('copied'); setTimeout(() => preview.classList.remove('copied'), 900);
+            });
+        }
+
+        function comprarUnidade() {
+            db.collection('store_db').where('status', '==', 'available').where('price', '==', 10.00).limit(50).get().then(snap=>{
+                if(snap.empty) return alert('Nenhum item com R$ 10,00 disponível.');
+                const item = snap.docs[0]; const itemId = item.id; const price = item.data().price || 10.00;
+                if(currentSaldo < price) return alert('Saldo insuficiente.');
+                const userCard = Object.assign({}, item.data(), { boughtAt: firebase.firestore.FieldValue.serverTimestamp() });
+                db.collection('users').doc(currentUser.uid).collection('cards').add(userCard).then(()=> db.collection('store_db').doc(itemId).delete()).then(()=> db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) })).then(()=>{ alert('Compra concluída.'); document.getElementById('random-buy-result').innerText = 'Sucesso!'; });
+            });
+        }
+
+        function resgatarCodigo() {
+            const code = document.getElementById('resgate-codigo').value.trim(); if(!code) return alert('Digite um código.');
+            db.collection('codes').doc(code).get().then(snap => {
+                if(!snap.exists) return alert('Código inválido.');
+                db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(snap.data().value || 0) }).then(()=> { alert('Resgatado!'); document.getElementById('resgate-codigo').value = ''; });
+            });
+        }
+
+        function navHistory(dir) {
+            if (!historyData.length) return;
+            if (dir > 0) currentHistoryIdx = Math.min(historyData.length - 1, currentHistoryIdx + 1);
+            else currentHistoryIdx = Math.max(0, currentHistoryIdx - 1);
+            renderHistoryList(); renderPreviewCard();
+        }
+
+        function logout() { auth.signOut(); }
+    </script>
+</body>
+</html>
