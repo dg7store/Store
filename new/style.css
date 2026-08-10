@@ -159,13 +159,12 @@ button:active {
 }
 .carousel-btn:disabled { opacity: 0.3; cursor: not-allowed; border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.2); }
 
-/* AJUSTE DO CARTÃO PARA NÃO CORTAR */
 .cc-preview-card {
     position: relative;
     flex: 1;
     width: 100%;
     max-width: 310px;
-    min-height: 190px; /* Garante que o conteúdo não seja esmagado */
+    min-height: 190px;
     background: linear-gradient(135deg, #181818, #333333 50%, #111111 100%);
     border: 1px solid rgba(255,255,255,0.15);
     border-radius: 14px;
@@ -248,7 +247,7 @@ button:active {
 .logo-font .text-gold { color: #fbc02d; }
 .logo-font .text-silver { color: #9bff9c; }
 
-/* --- GTA SAN ANDREAS HUD NOVO --- */
+/* --- GTA SAN ANDREAS HUD --- */
 .gta-hud { display: inline-block; position: relative; }
 .gta-hud img { 
     width: 85px; height: 85px; border-radius: 50%; border: 2px solid #000; 
@@ -256,10 +255,10 @@ button:active {
     box-shadow: 2px 2px 8px rgba(0,0,0,0.9);
 }
 .gta-money { 
-    position: absolute; bottom: -5px; right: -25px; /* Por cima da foto */
-    font-family: 'Impact', 'Arial Black', sans-serif; font-size: 26px; color: #b7ffb7; /* Verde claro brilhante */
+    position: absolute; bottom: -5px; right: -25px; 
+    font-family: 'Impact', 'Arial Black', sans-serif; font-size: 26px; color: #b7ffb7; 
     -webkit-text-stroke: 1px #000; 
-    text-shadow: 0 0 8px #00ff55, 0 0 15px #00ff55, 2px 2px 2px #000; /* Neon Forte */
+    text-shadow: 0 0 8px #00ff55, 0 0 15px #00ff55, 2px 2px 2px #000; 
     letter-spacing: 1px; z-index: 10; pointer-events: none;
 }
 
