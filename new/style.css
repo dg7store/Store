@@ -88,24 +88,13 @@ button:active {
 
 .hidden { display: none !important; }
 
-.flex-row { 
-    display: flex; 
-    justify-content: space-between; 
-    gap: 8px; 
-    flex-wrap: wrap;
-}
+.flex-row { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .flex-row > * { flex: 1 1 auto; min-width: 100px; }
 
 .text-center { text-align: center; }
 .status-pill { text-align: center; font-size: 12px; color: var(--primary-neon); margin: 5px 0; }
 
-.menu-tabs {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 18px 0 24px;
-}
-
+.menu-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 24px; }
 .tab-button {
     flex: 1 1 30%;
     padding: 12px 10px;
@@ -121,95 +110,43 @@ button:active {
     font-size: 11px;
 }
 .tab-button:hover { transform: translateY(-1px); }
-.tab-active {
-    background: rgba(255, 42, 42, 0.95);
-    color: #fff;
-    border-color: rgba(255, 42, 42, 0.95);
-}
+.tab-active { background: rgba(255, 42, 42, 0.95); color: #fff; border-color: rgba(255, 42, 42, 0.95); }
 
 .section-pane { display: block; }
 .section-hidden { display: none; }
 
 /* Carrossel e Cartão Físico Fiel */
-.carousel-container {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    width: 100%;
-    margin: 10px 0 20px;
-}
-
+.carousel-container { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; margin: 10px 0 20px; }
 .carousel-btn {
-    background: rgba(0, 255, 85, 0.1);
-    border: 1px solid var(--primary-neon);
-    color: var(--primary-neon);
-    border-radius: 50%;
-    width: 45px;
-    height: 45px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    cursor: pointer;
-    transition: all 0.2s;
-    flex-shrink: 0;
-    padding: 0;
-    margin: 0;
+    background: rgba(0, 255, 85, 0.1); border: 1px solid var(--primary-neon); color: var(--primary-neon);
+    border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; cursor: pointer; transition: all 0.2s; flex-shrink: 0; padding: 0; margin: 0;
 }
 .carousel-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .cc-preview-card {
-    position: relative;
-    flex: 1;
-    width: 100%;
-    max-width: 360px;
-    aspect-ratio: 1.586; /* PROPORÇÃO REAL DE CARTÃO DE PLÁSTICO ISO/IEC 7810 */
+    position: relative; flex: 1; width: 100%; max-width: 360px; aspect-ratio: 1.586;
     background: linear-gradient(135deg, #181818, #333333 50%, #111111 100%);
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 14px;
-    padding: 8% 6%; /* Padding responsivo para manter a proporção */
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.9);
-    cursor: pointer;
-    margin: 0 auto;
-    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 8% 6%;
+    display: flex; flex-direction: column; justify-content: space-between;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.9); cursor: pointer; margin: 0 auto; overflow: hidden;
 }
 .cc-preview-card::before {
-    content: '';
-    position: absolute; inset: 0;
-    border-radius: 14px;
-    background: linear-gradient(120deg, rgba(255,255,255,0.08), transparent 45%, rgba(255,255,255,0.02));
-    pointer-events: none;
+    content: ''; position: absolute; inset: 0; border-radius: 14px;
+    background: linear-gradient(120deg, rgba(255,255,255,0.08), transparent 45%, rgba(255,255,255,0.02)); pointer-events: none;
 }
 
 /* BOTÃO DE INFO ('i') NO CARTÃO */
 .info-btn {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    background: rgba(0, 0, 0, 0.6);
-    border: 1px solid var(--primary-neon);
-    color: var(--primary-neon);
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    z-index: 10;
-    cursor: pointer;
-    box-shadow: 0 0 5px rgba(0,255,85,0.3);
-    padding: 0; margin: 0;
+    position: absolute; top: 12px; right: 12px; background: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--primary-neon); color: var(--primary-neon); width: 26px; height: 26px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; z-index: 10; cursor: pointer; box-shadow: 0 0 5px rgba(0,255,85,0.3); padding: 0; margin: 0;
 }
-
 .cc-preview-card.copied { box-shadow: 0 0 0 3px var(--primary-neon); transition: box-shadow 0.2s; }
 .cc-top { display:flex; justify-content:space-between; align-items:center; }
 .cc-chip { width: 50px; height: 35px; border-radius: 6px; background: linear-gradient(135deg, #e4c46b, #b38400); box-shadow: inset 1px 1px 4px rgba(0,0,0,0.3); }
-.cc-brand { font-size: 16px; font-weight: bold; color: #fff; letter-spacing: 2px; margin-right: 35px;} /* Margin pra não encostar no 'i' */
+.cc-brand { font-size: 16px; font-weight: bold; color: #fff; letter-spacing: 2px; margin-right: 35px;}
 .cc-number { font-size: clamp(18px, 6vw, 24px); letter-spacing: 3px; color: #fff; margin-top: auto; margin-bottom: 5px; font-family: 'Courier New', monospace; text-shadow: 1px 1px 2px #000; }
 .cc-name { font-size: clamp(11px, 4vw, 14px); color: #dce9dc; font-family: 'Courier New', monospace; letter-spacing: 1px;}
 .cc-footer { display:flex; justify-content:space-between; gap: 12px; margin-top: 5px; color: #dce9dc; font-size: 11px; }
@@ -219,15 +156,8 @@ button:active {
 
 .history-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .history-card { 
-    width: 100%; 
-    border: 1px solid rgba(255,255,255,0.08); 
-    background: rgba(255,255,255,0.03); 
-    border-radius: 12px; 
-    padding: 10px; 
-    text-align: left; 
-    color: inherit; 
-    transition: all 0.2s ease;
-    margin: 0;
+    width: 100%; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); 
+    border-radius: 12px; padding: 10px; text-align: left; color: inherit; transition: all 0.2s ease; margin: 0;
 }
 .history-card.active { border-color: var(--secondary-neon); background: rgba(255,42,42,0.1); }
 .card-top { display:flex; justify-content:space-between; align-items:center; gap:5px; }
@@ -247,12 +177,22 @@ button:active {
 .logo-font .text-gold { color: #fbc02d; }
 .logo-font .text-silver { color: #9bff9c; }
 
-/* --- GTA SAN ANDREAS HUD --- */
-.gta-hud { display: flex; flex-direction: column; align-items: flex-end; }
-.gta-hud img { width: 75px; height: 75px; border-radius: 50%; border: 2px solid #000; object-fit: cover; margin-bottom: -10px; filter: contrast(1.1) brightness(0.9); box-shadow: 2px 2px 8px rgba(0,0,0,0.9); z-index: 2; }
-.gta-money { font-family: 'Impact', 'Arial Black', sans-serif; font-size: 28px; color: #55ff55; -webkit-text-stroke: 1.5px #0a3314; text-shadow: 0 0 10px rgba(0, 255, 85, 0.6), 2px 2px 2px #000; letter-spacing: 1px; z-index: 1; }
+/* --- GTA SAN ANDREAS HUD NOVO --- */
+.gta-hud { display: inline-block; position: relative; }
+.gta-hud img { 
+    width: 85px; height: 85px; border-radius: 50%; border: 2px solid #000; 
+    object-fit: cover; cursor: pointer; filter: contrast(1.1) brightness(0.9); 
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.9);
+}
+.gta-money { 
+    position: absolute; bottom: -5px; right: -25px; /* Por cima da foto */
+    font-family: 'Impact', 'Arial Black', sans-serif; font-size: 26px; color: #b7ffb7; /* Verde claro brilhante */
+    -webkit-text-stroke: 1px #000; 
+    text-shadow: 0 0 8px #00ff55, 0 0 15px #00ff55, 2px 2px 2px #000; /* Neon Forte */
+    letter-spacing: 1px; z-index: 10; pointer-events: none;
+}
 
-/* LIVE SEARCH & MODAL */
+/* LIVE SEARCH & MODAIS */
 .live-search-card { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 15px; text-align: left; margin-bottom: 10px; }
 .live-search-card .title { font-size: 16px; font-weight: bold; color: var(--primary-neon); margin-bottom: 6px; letter-spacing: 1px;}
 .live-search-card .info { font-size: 10px; color: var(--text-main); margin-bottom: 12px; line-height: 1.5; }
@@ -260,6 +200,6 @@ button:active {
 
 .info-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: 0.2s; padding: 20px;}
 .info-modal.active { opacity: 1; pointer-events: auto; }
-.info-modal .glass-panel { max-width: 400px; padding: 30px; text-align: left;}
-.info-row { border-bottom: 1px dashed rgba(255,255,255,0.1); padding: 8px 0; font-size: 11px; }
+.info-modal .glass-panel { max-width: 400px; padding: 30px; text-align: center;}
+.info-row { border-bottom: 1px dashed rgba(255,255,255,0.1); padding: 8px 0; font-size: 11px; text-align: left;}
 .info-row strong { color: var(--primary-neon); display: inline-block; width: 80px; }
