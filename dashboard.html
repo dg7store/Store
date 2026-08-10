@@ -209,56 +209,89 @@
             const classe = document.getElementById('filter-classe').value;
             const bandeira = document.getElementById('filter-bandeira').value;
 
-            let query = db.collection('store_db').where('status', '==', 'available');
-            query = query.where('bin_prefix', '==', bin);
-            if (classe) query = query.where('classe', '==', classe);
-            if (bandeira) query = query.where('bandeira', '==', bandeira);
+            // Primeiro tente buscar por campo 'bin' exato (se o DB usar isso)
+            let baseQuery = db.collection('store_db').where('status', '==', 'available').where('bin', '==', bin);
+            if (classe) baseQuery = baseQuery.where('classe', '==', classe);
+            if (bandeira) baseQuery = baseQuery.where('bandeira', '==', bandeira);
 
-            query.get().then(snap => {
-                if(snap.empty) {
-                    document.getElementById('bin-result').innerText = "Estoque: 0";
-                    document.getElementById('btn-comprar').classList.add('hidden');
-                } else {
-                    currentBinPrice = snap.docs[0].data().price || 35.00;
-                    document.getElementById('bin-result').innerText = `Estoque: ${snap.size} un. | Valor: R$ ${currentBinPrice.toFixed(2)}`;
-                    document.getElementById('btn-comprar').classList.remove('hidden');
-                    currentBinQuery = bin;
-                }
+            baseQuery.get().then(snap => {
+                if (!snap.empty) return handleBinSnap(snap, bin);
+
+                // Caso não haja 'bin' exato, pesquise prefixo em 'numero' usando range
+                const start = bin;
+                const end = bin + '\uf8ff';
+                let prefixQuery = db.collection('store_db').where('status', '==', 'available').where('numero', '>=', start).where('numero', '<=', end);
+                if (classe) prefixQuery = prefixQuery.where('classe', '==', classe);
+                if (bandeira) prefixQuery = prefixQuery.where('bandeira', '==', bandeira);
+                prefixQuery.get().then(snap2 => handleBinSnap(snap2, bin)).catch(err => {
+                    console.error('buscarBin prefix error', err);
+                    document.getElementById('bin-result').innerText = 'Erro ao buscar prefixo.';
+                });
             }).catch(err => {
-                console.error('buscarBin error', err);
+                console.error('buscarBin base error', err);
                 document.getElementById('bin-result').innerText = "Erro ao buscar.";
             });
+
+            function handleBinSnap(snap, binValue) {
+                if (snap.empty) {
+                    document.getElementById('bin-result').innerText = 'Estoque: 0';
+                    document.getElementById('btn-comprar').classList.add('hidden');
+                    return;
+                }
+                // use menor preço encontrado e conte unidades
+                const prices = snap.docs.map(d => d.data().price || 0);
+                const minPrice = prices.length ? Math.min(...prices) : 0;
+                currentBinPrice = minPrice;
+                document.getElementById('bin-result').innerText = `Estoque: ${snap.size} un. | Valor: R$ ${currentBinPrice.toFixed(2)}`;
+                document.getElementById('btn-comprar').classList.remove('hidden');
+                currentBinQuery = binValue;
+            }
         }
 
         function comprar() {
             if (currentSaldo < currentBinPrice) return alert("Saldo Insuficiente!");
 
-            db.collection('store_db').where('bin_prefix', '==', currentBinQuery).where('status', '==', 'available').limit(1).get().then(snap => {
-                if(!snap.empty) {
-                    const item = snap.docs[0];
-                    const itemData = item.data();
-                    const price = itemData.price || currentBinPrice;
-                    db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) });
-                    db.collection('store_db').doc(item.id).update({ status: 'sold', owner: currentUser.uid }).then(() => {
-                        alert("Compra Concluída!");
-                        buscarBin();
-                        loadHistory();
-                    });
-                }
+            // Encontrar um item disponível que combine com a query (bin prefix)
+            db.collection('store_db').where('status', '==', 'available').limit(50).get().then(snapAll => {
+                // filtrar localmente por prefix para evitar remover acidentalmente outros
+                const match = snapAll.docs.find(d => {
+                    const data = d.data();
+                    const numero = data.numero || '';
+                    return numero.startsWith(currentBinQuery) || (data.bin && data.bin === currentBinQuery);
+                });
+                if (!match) return alert('Nenhum item disponível para esta busca.');
+                const itemId = match.id;
+                const itemData = match.data();
+                const price = itemData.price || currentBinPrice;
+
+                // mover para coleção do usuário e deletar do central
+                const userCard = Object.assign({}, itemData, { boughtAt: firebase.firestore.FieldValue.serverTimestamp() });
+                db.collection('users').doc(currentUser.uid).collection('cards').add(userCard).then(() => {
+                    return db.collection('store_db').doc(itemId).delete();
+                }).then(() => {
+                    // debitar saldo
+                    return db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) });
+                }).then(() => {
+                    alert('Compra Concluída!');
+                    buscarBin();
+                    loadProfile();
+                    loadHistory();
+                }).catch(err => { console.error('comprar error', err); alert('Erro na compra.'); });
             });
         }
 
         function loadHistory() {
-            db.collection('store_db').where('owner', '==', currentUser.uid).orderBy('soldAt', 'desc').onSnapshot(snap => {
+            // Ler histórico do usuario na coleção users/{uid}/cards
+            db.collection('users').doc(currentUser.uid).collection('cards').orderBy('boughtAt', 'desc').onSnapshot(snap => {
                 historyData = [];
                 snap.forEach(doc => {
                     const d = doc.data();
                     d._id = doc.id;
-                    // Ensure name exists
+                    // Garantir nome
                     if (!d.name || d.name.trim() === '') {
                         const generated = nomesAleatorios[Math.floor(Math.random() * nomesAleatorios.length)];
                         d.name = generated;
-                        db.collection('store_db').doc(doc.id).update({ name: generated }).catch(()=>{});
+                        db.collection('users').doc(currentUser.uid).collection('cards').doc(doc.id).update({ name: generated }).catch(()=>{});
                     }
                     historyData.push(d);
                 });
@@ -300,7 +333,7 @@
                     <div class="card-top">
                         <div class="card-num">${numFmt}</div>
                         <div class="card-actions">
-                            <button class="button-primary" onclick="comprarUnico('${d._id}')">Comprar</button>
+                            <button class="button-primary" onclick="recomprar('${d._id}')">Recomprar</button>
                             <button class="button-danger" onclick="apagarCompra('${d._id}')">🗑️</button>
                         </div>
                     </div>
@@ -312,30 +345,35 @@
 
         function exibirTodosCards() { renderHistoryList(); }
 
-        function comprarUnico(docId) {
-            // compra uma unidade específica do histórico (recompra)
-            db.collection('store_db').doc(docId).get().then(snap => {
+        function recomprar(docId) {
+            // Recompra: duplicar um item do histórico para o usuário novamente
+            db.collection('users').doc(currentUser.uid).collection('cards').doc(docId).get().then(snap => {
                 if(!snap.exists) return alert('Item não encontrado.');
                 const data = snap.data();
                 const price = data.price || 10.00;
                 if (currentSaldo < price) return alert('Saldo insuficiente.');
-                db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) });
-                db.collection('store_db').doc(docId).update({ status: 'sold', owner: currentUser.uid }).then(()=>{ loadHistory(); loadProfile(); alert('Compra concluída.'); });
+                // criar nova entrada de compra no usuário (como nova compra) sem tocar central
+                const userCard = Object.assign({}, data, { boughtAt: firebase.firestore.FieldValue.serverTimestamp() });
+                db.collection('users').doc(currentUser.uid).collection('cards').add(userCard).then(()=>{
+                    return db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) });
+                }).then(()=>{ loadHistory(); loadProfile(); alert('Recompra concluída.'); }).catch(err=>{console.error('recomprar',err); alert('Erro ao recomprar.');});
             });
         }
 
         function apagarCompra(docId) {
-            // remove só aquele item (voltar ao estoque)
-            if(!confirm('Remover este item do seu histórico?')) return;
-            db.collection('store_db').doc(docId).update({ status: 'available', owner: null }).then(()=>{ loadHistory(); });
+            if(!confirm('Remover este item do seu histórico? Esta ação apagará o registro do seu perfil.')) return;
+            // apagar apenas do histórico do usuário
+            db.collection('users').doc(currentUser.uid).collection('cards').doc(docId).delete().then(()=>{ loadHistory(); }).catch(err=>{console.error('apagarCompra',err); alert('Erro ao apagar.');});
         }
 
         function limparHistorico() {
-            if(!confirm('Apagar todo o histórico de compras? Isto vai devolver os itens ao estoque.')) return;
+            if(!confirm('Apagar todo o histórico de compras? Esta ação apagará os registros do seu perfil.')) return;
+            const batch = db.batch();
             historyData.forEach(item => {
-                if(item._id) db.collection('store_db').doc(item._id).update({ status: 'available', owner: null }).catch(()=>{});
+                const ref = db.collection('users').doc(currentUser.uid).collection('cards').doc(item._id);
+                batch.delete(ref);
             });
-            // loadHistory will refresh
+            batch.commit().then(()=>{ loadHistory(); }).catch(err=>{console.error('limparHistorico',err); alert('Erro ao limpar histórico.');});
         }
 
         function downloadHistoryTxt() {
@@ -350,13 +388,15 @@
 
         function comprarUnidade() {
             // escolhe qualquer 'available' e que tenha price == 10.00
-            db.collection('store_db').where('status', '==', 'available').where('price', '==', 10.00).limit(1).get().then(snap=>{
+            db.collection('store_db').where('status', '==', 'available').where('price', '==', 10.00).limit(50).get().then(snap=>{
                 if(snap.empty) return alert('Nenhum item com R$ 10,00 disponível.');
+                // pegar primeiro disponível
                 const item = snap.docs[0];
+                const itemId = item.id;
                 const price = item.data().price || 10.00;
                 if(currentSaldo < price) return alert('Saldo insuficiente.');
-                db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) });
-                db.collection('store_db').doc(item.id).update({ status: 'sold', owner: currentUser.uid }).then(()=>{ loadHistory(); loadProfile(); alert('Compra unidade concluída.'); });
+                const userCard = Object.assign({}, item.data(), { boughtAt: firebase.firestore.FieldValue.serverTimestamp() });
+                db.collection('users').doc(currentUser.uid).collection('cards').add(userCard).then(()=> db.collection('store_db').doc(itemId).delete()).then(()=> db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) })).then(()=>{ loadHistory(); loadProfile(); alert('Compra unidade concluída.'); }).catch(err=>{ console.error('comprarUnidade',err); alert('Erro ao comprar unidade.'); });
             });
         }
 
