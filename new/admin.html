@@ -29,10 +29,12 @@
       <div class="glass-panel hidden" id="admin-panel" style="padding: 20px 15px; margin-top: 15px;">
           
           <h3 style="color:var(--secondary-neon); font-size: 16px;">Extrator Master</h3>
-          <p style="font-size: 10px; margin-bottom: 10px;">Consulta Juspay API para salvar dados do cartão gerando CEP e Nome auto.</p>
-          <textarea id="raw-text" rows="4" placeholder="Cole listas aqui..." style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 10px; margin-bottom: 10px;"></textarea>
-          <button class="button-primary" onclick="parseText()" style="padding: 12px;">Extrair</button>
+          <p style="font-size: 10px; margin-bottom: 10px;">Consulta de BINS otimizada. Mostra o progresso para não travar a tela.</p>
+          <textarea id="raw-text" rows="4" placeholder="Cole as listas de cartões aqui..." style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 10px; margin-bottom: 10px;"></textarea>
+          <button class="button-primary" onclick="parseText()" style="padding: 12px;">Extrair e Consultar</button>
+          
           <div id="parsed-results" style="margin-top:15px; font-size:12px; background:rgba(0,0,0,0.8); padding:15px; border:1px solid #111; border-radius: 8px;"></div>
+          
           <button class="button-secondary" onclick="uploadToDB()" style="margin-top: 15px; padding: 12px; border-color: var(--primary-neon); color: var(--primary-neon);">Subir para DB</button>
           
           <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 25px 0;">
@@ -147,7 +149,6 @@
                     <option value="BIN">Escolher BIN Específica</option>
                 </select>
             </div>
-            
             <div id="filtro-opcoes-${id}">
                 <div class="flex-row">
                     <select id="regra-bandeira-${id}" style="flex:0.5;">${getOptionsHtml(setBandeiras, 'QUALQUER BANDEIRA')}</select>
@@ -163,7 +164,6 @@
                     <option value="DEBIT">DÉBITO</option>
                 </select>
             </div>
-
             <div id="bin-opcoes-${id}" class="hidden">
                 <select id="regra-bin-${id}">
                     ${getOptionsHtml(setBins, 'SELECIONE UMA BIN EM ESTOQUE...')}
@@ -194,7 +194,6 @@
         if(boxes.length === 0) return alert("Você precisa adicionar pelo menos uma regra/cartão ao pacote.");
 
         const regrasArray = [];
-        
         boxes.forEach(box => {
             const id = box.id.split('-')[2];
             const qtd = parseInt(document.getElementById(`regra-qtd-${id}`).value);
@@ -203,7 +202,6 @@
             if(isNaN(qtd) || qtd <= 0) return alert("Quantidade inválida em uma das regras.");
 
             const regraObj = { qtd: qtd, tipoBusca: tipoBusca };
-
             if(tipoBusca === 'BIN') {
                 const binVal = document.getElementById(`regra-bin-${id}`).value;
                 if(binVal === 'QUALQUER') return alert("Selecione uma BIN válida.");
@@ -218,13 +216,10 @@
             regrasArray.push(regraObj);
         });
 
-        if(regrasArray.length !== boxes.length) return;
+        if(regrasArray.length !== boxes.length) return; 
 
         db.collection('store_buttons').add({
-            titulo: titulo,
-            preco: preco,
-            regras: regrasArray,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            titulo: titulo, preco: preco, regras: regrasArray, createdAt: firebase.firestore.FieldValue.serverTimestamp()
         }).then(() => {
             alert("Botão salvo e criptografado com sucesso!");
             document.getElementById('btn-titulo').value = '';
@@ -243,16 +238,12 @@
             snap.forEach(doc => {
                 const b = doc.data();
                 let regrasResumo = "";
-                
-                // Trava de segurança para não quebrar a tela se tiver botão antigo
                 if (b.regras && Array.isArray(b.regras)) {
-                    b.regras.forEach((r, idx) => {
+                    b.regras.forEach(r => {
                         if(r.tipoBusca === 'BIN') regrasResumo += `<br>▶ ${r.qtd}x BIN ${r.bin}`;
                         else regrasResumo += `<br>▶ ${r.qtd}x ${r.pais==='QUALQUER'?'Mix':r.pais} ${r.bandeira==='QUALQUER'?'':r.bandeira} ${r.classe==='QUALQUER'?'':r.classe}`;
                     });
-                } else {
-                    regrasResumo = "<br>▶ <span style='color:red;'>[Botão Formato Antigo]</span>";
-                }
+                } else { regrasResumo = "<br>▶ <span style='color:red;'>[Botão Formato Antigo]</span>"; }
 
                 const titulo = b.titulo || "SEM TÍTULO";
                 const precoFormat = b.preco ? b.preco.toFixed(2) : "0.00";
@@ -266,6 +257,7 @@
         });
     }
 
+    let parsedItems = []; let uniqueBins = new Set(); 
     const nomesAleatoriosBR = ["MARCELO P SILVA", "FERNANDA SOUZA", "ROBERTO C LIMA", "JULIANA COSTA", "MARCOS OLIVEIRA", "LUCAS A MARTINS", "ANA SANTOS", "GABRIEL R ALVES"];
     const nomesAleatoriosUS = ["JOHN SMITH", "MARY JOHNSON", "ROBERT WILLIAMS", "LINDA BROWN", "MICHAEL JONES", "WILLIAM GARCIA", "DAVID MARTINEZ"];
 
@@ -274,14 +266,40 @@
       if (first === '4') return 'VISA'; if (prefix >= '51' && prefix <= '55' || prefix >= '22' && prefix <= '27') return 'MASTERCARD'; if (first === '3' && (String(num).startsWith('34') || String(num).startsWith('37'))) return 'AMEX'; return 'OUTRA';
     }
 
+    // DUPLA CONSULTA ANTI-TRAVAMENTO (Binlist -> Juspay)
     async function inferMetaForBin(bin) {
-      try { 
-          const response = await fetch(`https://api.juspay.in/cardbins/${bin}`, { headers: { Accept: 'application/json' } }); 
-          if (!response.ok) throw new Error('offline'); 
-          const data = await response.json(); 
-          return { bandeira: data.brand || inferClasseFromNumber(bin), classe: data.card_sub_type || 'CLASSIC', tipo: data.type || data.extended_card_type || 'CREDITO', pais: data.country || 'DESCONHECIDO', banco: data.bank || 'DESCONHECIDO' }; 
-      } 
-      catch (e) { return { bandeira: inferClasseFromNumber(bin), classe: 'CLASSIC', tipo: 'CREDITO', pais: 'DESCONHECIDO', banco: 'DESCONHECIDO' }; }
+        // Tenta Binlist primeiro
+        try { 
+            const res1 = await fetch(`https://lookup.binlist.net/${bin}`, { headers: { Accept: 'application/json' } }); 
+            if (res1.ok) {
+                const data = await res1.json();
+                return { 
+                    bandeira: data.scheme ? data.scheme.toUpperCase() : inferClasseFromNumber(bin), 
+                    classe: data.type ? data.type.toUpperCase() : 'CLASSIC', 
+                    tipo: data.type ? data.type.toUpperCase() : 'CREDITO',
+                    pais: (data.country && data.country.name) ? data.country.name.toUpperCase() : 'DESCONHECIDO',
+                    banco: (data.bank && data.bank.name) ? data.bank.name.toUpperCase() : 'DESCONHECIDO'
+                }; 
+            }
+        } catch (e) {}
+
+        // Tenta Juspay caso a Binlist falhe
+        try {
+            const res2 = await fetch(`https://api.juspay.in/cardbins/${bin}`, { headers: { Accept: 'application/json' } }); 
+            if (res2.ok) {
+                const data = await res2.json();
+                return { 
+                    bandeira: data.brand ? data.brand.toUpperCase() : inferClasseFromNumber(bin), 
+                    classe: data.card_sub_type ? data.card_sub_type.toUpperCase() : 'CLASSIC', 
+                    tipo: data.type ? data.type.toUpperCase() : 'CREDITO',
+                    pais: data.country ? data.country.toUpperCase() : 'DESCONHECIDO',
+                    banco: data.bank ? data.bank.toUpperCase() : 'DESCONHECIDO'
+                };
+            }
+        } catch (e) {}
+
+        // Retorno padrão de segurança
+        return { bandeira: inferClasseFromNumber(bin), classe: 'CLASSIC', tipo: 'CREDITO', pais: 'DESCONHECIDO', banco: 'DESCONHECIDO' };
     }
 
     function gerarDadosPorPais(paisInfo) {
@@ -308,8 +326,18 @@
                 }
             });
             if (toUpdate.length === 0) { statusBox.innerText = 'Varredura completa.'; return alert('DB Perfeita! Nenhum cartão precisava ser corrigido.'); }
-            statusBox.innerText = `Consultando Juspay para ${binsToFetch.size} BINs exclusivas pendentes...`;
-            const metaMap = {}; for (const b of [...binsToFetch]) { metaMap[b] = await inferMetaForBin(b); }
+            
+            statusBox.innerHTML = `Consultando APIs para ${binsToFetch.size} BINs exclusivas pendentes...<br><span id="sweep-prog"></span>`;
+            const metaMap = {};
+            let countProg = 0;
+            const binsArr = [...binsToFetch];
+            
+            for (const b of binsArr) { 
+                countProg++;
+                document.getElementById('sweep-prog').innerText = `BIN ${countProg} de ${binsArr.length}...`;
+                metaMap[b] = await inferMetaForBin(b); 
+            }
+            
             statusBox.innerText = `Corrigindo ${toUpdate.length} cartões na DB...`;
             const batch = db.batch(); let count = 0;
             for (const item of toUpdate) {
@@ -328,6 +356,7 @@
       parsedItems = []; uniqueBins.clear();
       let outputHTML = '<h4 style="color:var(--text-main); margin-bottom: 8px;">Itens Extraídos:</h4><div style="margin-bottom:15px; font-size:11px; line-height: 1.4;">';
       for (const line of lines) {
+        // Regex super flexível
         const match = line.match(/(\d{13,19})[\D]+(\d{2})[\D]+(\d{2,4})[\D]+(\d{3,4})/); if (!match) continue;
         const num = match[1]; const mes = match[2]; const anoStr = match[3]; const ano = anoStr.length === 2 ? '20' + anoStr : anoStr; const cvc = match[4]; const bin = num.substring(0, 6);
         uniqueBins.add(bin); parsedItems.push({ numero: num, exp: `${mes}/${ano}`, cvc, bin, bin_prefix: bin, status: 'available', owner: null });
@@ -337,19 +366,27 @@
       outputHTML += '</div>';
 
       if (parsedItems.length > 0) {
-          document.getElementById('parsed-results').innerHTML = '<span style="color:#00ff55;">Consultando API Juspay para as BINS... aguarde.</span>';
+          document.getElementById('parsed-results').innerHTML = `<span style="color:#00ff55;">Consultando APIs para ${uniqueBins.size} BINS... aguarde.</span><br><span id="extract-prog" style="color:#fff; font-size:11px;"></span>`;
+          
           const binList = [...uniqueBins]; const metaMap = {};
-          for (const bin of binList) { const meta = await inferMetaForBin(bin); metaMap[bin] = meta; }
+          let bCount = 0;
+          for (const bin of binList) { 
+              bCount++;
+              document.getElementById('extract-prog').innerText = `Verificando ${bCount} de ${binList.length}...`;
+              metaMap[bin] = await inferMetaForBin(bin); 
+          }
+          
           parsedItems.forEach(item => { 
               const meta = metaMap[item.bin] || {}; 
               item.bandeira = meta.bandeira; item.classe = meta.classe; item.tipo = meta.tipo; item.pais = meta.pais; item.banco = meta.banco;
               const infoGerada = gerarDadosPorPais(item.pais); item.name = infoGerada.name; item.cep = infoGerada.cep;
           });
+
           outputHTML += '<h4 style="color: var(--secondary-neon); margin-bottom: 10px; font-size: 14px;">Defina os Preços Ocultos:</h4>';
           [...uniqueBins].forEach(bin => { 
               outputHTML += `<div style="margin-bottom: 12px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;"> 
               BIN <strong>${bin}</strong> (${metaMap[bin].bandeira} - ${metaMap[bin].banco}): 
-              <input type="number" id="price-${bin}" placeholder="R$ (Opcional)" style="width: 100%; padding: 12px; margin-top: 8px; font-size: 14px;"> 
+              <input type="number" id="price-${bin}" placeholder="R$ (Opcional, só se for vender pela Busca Live)" style="width: 100%; padding: 12px; margin-top: 8px; font-size: 14px;"> 
               </div>`; 
           });
           document.getElementById('parsed-results').innerHTML = outputHTML;
@@ -360,7 +397,8 @@
       if (parsedItems.length === 0) return alert('Nada para subir.');
       let binPrices = {}; 
       [...uniqueBins].forEach(bin => {
-          let priceVal = parseFloat(document.getElementById(`price-${bin}`).value);
+          let priceElem = document.getElementById(`price-${bin}`);
+          let priceVal = priceElem ? parseFloat(priceElem.value) : 0;
           if (isNaN(priceVal) || priceVal <= 0) { priceVal = 0; } 
           binPrices[bin] = priceVal;
       });
