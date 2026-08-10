@@ -27,8 +27,9 @@
       </div>
 
       <div class="glass-panel hidden" id="admin-panel" style="padding: 20px 15px; margin-top: 15px;">
-          <h3 style="color:var(--secondary-neon); font-size: 16px;">Extrator Master</h3>
-          <p style="font-size: 10px; margin-bottom: 10px;">O extrator ignora caracteres estranhos, espaços ou barras (|) e separa os blocos de forma inteligente.</p>
+          
+          <h3 style="color:var(--secondary-neon); font-size: 16px;">Extrator Master Juspay</h3>
+          <p style="font-size: 10px; margin-bottom: 10px;">Extrai cartões ignorando lixo. Consulta automaticamente a API da Juspay para salvar Bandeira, Classe, Tipo e País (Gera nome BR se for Brasil).</p>
           
           <textarea id="raw-text" rows="6" placeholder="Cole qualquer lixo/texto aqui..." style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 10px; margin-bottom: 10px;"></textarea>
           
@@ -36,7 +37,13 @@
           
           <div id="parsed-results" style="margin-top:15px; font-size:12px; background:rgba(0,0,0,0.8); padding:15px; border:1px solid #111; border-radius: 8px;"></div>
           
-          <button class="button-secondary" onclick="uploadToDB()" style="margin-top: 15px; padding: 12px;">Subir para o Banco Central</button>
+          <button class="button-secondary" onclick="uploadToDB()" style="margin-top: 15px; padding: 12px; border-color: var(--primary-neon); color: var(--primary-neon);">Subir para o Banco Central</button>
+          
+          <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 25px 0;">
+
+          <h3 style="font-size: 16px; color: #fbc02d;">Manutenção e Varredura</h3>
+          <p style="font-size: 10px; margin-bottom: 10px;">Vasculha todo o banco de dados em busca de cartões que ficaram sem registro da BIN. Se já estiver consultada, ele pula sem dar erro.</p>
+          <button class="button-secondary" onclick="sweepDatabase()" style="padding: 12px; margin-bottom: 10px;">Iniciar Varredura na DB</button>
           
           <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 25px 0;">
 
@@ -46,6 +53,7 @@
             <input type="number" id="code-uses" placeholder="Qtd. Usos" style="flex: 1; padding: 12px;">
           </div>
           <button class="button-primary" onclick="generateCode()" style="padding: 12px;">Gerar Código</button>
+          
           <div id="generation-status" class="status-pill" style="margin-top: 10px;">Pronto para gerar.</div>
           <div id="generated-code" style="text-align:center; font-size: 22px; color: var(--primary-neon); margin-top: 15px; font-weight: bold;">DG7-XXXX-XXXX</div>
       </div>
@@ -79,15 +87,100 @@
     function liberarPainel() { document.getElementById('auth-check').classList.add('hidden'); document.getElementById('admin-panel').classList.remove('hidden'); }
 
     let parsedItems = []; let uniqueBins = new Set(); 
+    const nomesAleatoriosBR = ["MARCELO P SILVA", "FERNANDA SOUZA", "ROBERTO C LIMA", "JULIANA COSTA", "MARCOS OLIVEIRA", "LUCAS A MARTINS", "ANA SANTOS", "GABRIEL R ALVES"];
 
     function inferClasseFromNumber(num) {
       const first = String(num).charAt(0); const prefix = String(num).substring(0, 2);
       if (first === '4') return 'VISA'; if (prefix >= '51' && prefix <= '55' || prefix >= '22' && prefix <= '27') return 'MASTERCARD'; if (first === '3' && (String(num).startsWith('34') || String(num).startsWith('37'))) return 'AMEX'; return 'OUTRA';
     }
 
+    // Função Robusta: Consulta a Juspay e não quebra se falhar.
     async function inferMetaForBin(bin) {
-      try { const response = await fetch(`https://lookup.binlist.net/${bin}`, { headers: { Accept: 'application/json' } }); if (!response.ok) throw new Error('offline'); const data = await response.json(); const classe = inferClasseFromNumber(bin); const bandeira = data && data.country && data.country.alpha2 === 'BR' ? 'NACIONAL' : 'INTERNACIONAL'; return { classe, bandeira, brand: data.brand || '', scheme: data.scheme || '' }; } 
-      catch (e) { return { classe: inferClasseFromNumber(bin), bandeira: 'INTERNACIONAL' }; }
+      try { 
+          const response = await fetch(`https://api.juspay.in/cardbins/${bin}`, { headers: { Accept: 'application/json' } }); 
+          if (!response.ok) throw new Error('offline'); 
+          const data = await response.json(); 
+          
+          return { 
+              bandeira: data.brand || inferClasseFromNumber(bin), 
+              classe: data.card_sub_type || 'CLASSIC', 
+              tipo: data.type || data.extended_card_type || 'CREDITO',
+              pais: data.country || 'DESCONHECIDO'
+          }; 
+      } 
+      catch (e) { 
+          // Retorno de segurança se a API bloquear ou a internet cair
+          return { bandeira: inferClasseFromNumber(bin), classe: 'CLASSIC', tipo: 'CREDITO', pais: 'DESCONHECIDO' }; 
+      }
+    }
+
+    // --- NOVA FUNÇÃO DE VARREDURA (VASCULHA A DB E ATUALIZA FALTANTES) ---
+    async function sweepDatabase() {
+        const statusBox = document.getElementById('generation-status');
+        statusBox.innerText = 'Vasculhando a DB... aguarde.';
+        
+        try {
+            const snap = await db.collection('store_db').get();
+            const toUpdate = [];
+            const binsToFetch = new Set();
+
+            snap.forEach(doc => {
+                const data = doc.data();
+                // Verifica se tem algum cartão onde a BIN não foi consultada ou o país deu como Desconhecido
+                if (!data.bandeira || !data.classe || !data.pais || data.pais === 'DESCONHECIDO') {
+                    const bin = String(data.bin || data.numero || '').substring(0, 6);
+                    toUpdate.push({ id: doc.id, bin: bin });
+                    binsToFetch.add(bin);
+                }
+            });
+
+            if (toUpdate.length === 0) {
+                statusBox.innerText = 'Varredura completa.';
+                return alert('Sua Database está 100% perfeita. Nenhum cartão sem os registros da BIN foi encontrado.');
+            }
+
+            statusBox.innerText = `Baixando dados para ${binsToFetch.size} BINs pendentes...`;
+            const metaMap = {};
+            for (const b of [...binsToFetch]) {
+                metaMap[b] = await inferMetaForBin(b);
+            }
+
+            statusBox.innerText = `Gravando dados de ${toUpdate.length} cartões na DB...`;
+            const batch = db.batch();
+            let count = 0;
+
+            for (const item of toUpdate) {
+                const meta = metaMap[item.bin];
+                const isBR = meta.pais.toUpperCase().includes('BRAZIL') || meta.pais.toUpperCase() === 'BR' || meta.pais.toUpperCase().includes('BRASIL');
+                const name = isBR ? nomesAleatoriosBR[Math.floor(Math.random() * nomesAleatoriosBR.length)] : "NOME DESCONHECIDO";
+
+                const ref = db.collection('store_db').doc(item.id);
+                batch.update(ref, {
+                    bandeira: meta.bandeira,
+                    classe: meta.classe,
+                    tipo: meta.tipo,
+                    pais: meta.pais,
+                    name: name
+                });
+                
+                count++;
+                // O Firestore aguenta salvar 500 itens por vez. Se passar disso, enviamos em lotes.
+                if(count >= 490) { 
+                    await batch.commit();
+                    count = 0;
+                }
+            }
+            
+            if(count > 0) await batch.commit();
+
+            statusBox.innerText = 'Tudo sincronizado!';
+            alert(`Varredura finalizada! ${toUpdate.length} cartões foram corrigidos e atualizados na base de dados com sucesso.`);
+
+        } catch (error) {
+            console.error(error);
+            statusBox.innerText = 'Erro na sincronização.';
+            alert('Aconteceu um erro ao tentar varrer a Database. Tente novamente.');
+        }
     }
 
     async function parseText() {
@@ -100,7 +193,7 @@
         if (!match) continue;
         const num = match[1]; const mes = match[2]; const anoStr = match[3]; const ano = anoStr.length === 2 ? '20' + anoStr : anoStr; const cvc = match[4]; const bin = num.substring(0, 6);
         uniqueBins.add(bin);
-        parsedItems.push({ numero: num, exp: `${mes}/${ano}`, cvc, bin, bin_prefix: bin, status: 'available', owner: null, classe: 'OUTRA', bandeira: 'INTERNACIONAL' });
+        parsedItems.push({ numero: num, exp: `${mes}/${ano}`, cvc, bin, bin_prefix: bin, status: 'available', owner: null });
         outputHTML += `<strong>${num}</strong> | ${mes} | ${ano} | ${cvc}<br>`;
       }
 
@@ -108,21 +201,33 @@
       outputHTML += '</div>';
 
       if (parsedItems.length > 0) {
+          document.getElementById('parsed-results').innerHTML = '<span style="color:#00ff55;">Consultando API Juspay para as BINS... aguarde.</span>';
+          
+          const binList = [...uniqueBins]; const metaMap = {};
+          for (const bin of binList) { const meta = await inferMetaForBin(bin); metaMap[bin] = meta; }
+          
+          parsedItems.forEach(item => { 
+              const meta = metaMap[item.bin] || {}; 
+              item.bandeira = meta.bandeira; 
+              item.classe = meta.classe; 
+              item.tipo = meta.tipo;
+              item.pais = meta.pais;
+              
+              const isBR = item.pais.toUpperCase().includes('BRAZIL') || item.pais.toUpperCase() === 'BR' || item.pais.toUpperCase().includes('BRASIL');
+              item.name = isBR ? nomesAleatoriosBR[Math.floor(Math.random() * nomesAleatoriosBR.length)] : "NOME DESCONHECIDO";
+          });
+
           outputHTML += '<h4 style="color: var(--secondary-neon); margin-bottom: 10px; font-size: 14px;">Defina os Preços:</h4>';
           [...uniqueBins].forEach(bin => { 
               outputHTML += `<div style="margin-bottom: 12px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;"> 
-              BIN <strong>${bin}</strong>: 
+              BIN <strong>${bin}</strong> (${metaMap[bin].bandeira} - ${metaMap[bin].classe}): 
               <input type="number" id="price-${bin}" placeholder="R$ (Ex: 35.00)" style="width: 100%; padding: 12px; margin-top: 8px; font-size: 14px; box-sizing: border-box;"> 
               </div>`; 
           });
-      }
-
-      document.getElementById('parsed-results').innerHTML = outputHTML || 'Nenhum padrão encontrado. Verifique o texto.';
-
-      if (parsedItems.length > 0) {
-        const binList = [...uniqueBins]; const metaMap = {};
-        for (const bin of binList) { const meta = await inferMetaForBin(bin); metaMap[bin] = meta; }
-        parsedItems.forEach(item => { const meta = metaMap[item.bin] || {}; item.classe = meta.classe || inferClasseFromNumber(item.bin); item.bandeira = meta.bandeira || 'INTERNACIONAL'; item.bin_prefix = item.bin; });
+          
+          document.getElementById('parsed-results').innerHTML = outputHTML;
+      } else {
+          document.getElementById('parsed-results').innerHTML = 'Nenhum padrão encontrado. Verifique o texto.';
       }
     }
 
