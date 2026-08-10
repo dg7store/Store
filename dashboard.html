@@ -205,6 +205,19 @@
         let currentBinQuery = "";
         let currentBinPrice = 0;
 
+        function formatCardNumber(value) {
+            const digits = String(value || '').replace(/\D/g, '').slice(0, 16);
+            if (!digits) return '**** **** **** ****';
+            const groups = [];
+            for (let i = 0; i < digits.length; i += 4) groups.push(digits.slice(i, i + 4));
+            return groups.join(' ');
+        }
+
+        function safeText(value, fallback) {
+            const text = String(value || '').trim();
+            return text || fallback;
+        }
+
         function getClasseFromBin(bin, meta) {
             const brand = (meta && meta.brand ? meta.brand : '').toLowerCase();
             const scheme = (meta && meta.scheme ? meta.scheme : '').toLowerCase();
@@ -284,41 +297,35 @@
             const classe = classeSelect.value;
             const bandeira = bandeiraSelect.value;
 
-            let baseQuery = db.collection('store_db').where('status', '==', 'available').where('bin', '==', bin);
-            if (classe) baseQuery = baseQuery.where('classe', '==', classe);
-            if (bandeira) baseQuery = baseQuery.where('bandeira', '==', bandeira);
-
-            baseQuery.get().then(snap => {
-                if (!snap.empty) return handleBinSnap(snap, bin);
-
-                const start = bin;
-                const end = bin + '\uf8ff';
-                let prefixQuery = db.collection('store_db').where('status', '==', 'available').where('numero', '>=', start).where('numero', '<=', end);
-                if (classe) prefixQuery = prefixQuery.where('classe', '==', classe);
-                if (bandeira) prefixQuery = prefixQuery.where('bandeira', '==', bandeira);
-                prefixQuery.get().then(snap2 => handleBinSnap(snap2, bin)).catch(err => {
-                    console.error('buscarBin prefix error', err);
-                    binResult.innerText = 'Erro ao buscar prefixo.';
+            try {
+                const snap = await db.collection('store_db').where('status', '==', 'available').get();
+                const matches = snap.docs.filter(doc => {
+                    const data = doc.data() || {};
+                    const number = String(data.numero || '').replace(/\D/g, '');
+                    const docBin = String(data.bin || data.bin_prefix || '').replace(/\D/g, '').slice(0, 6);
+                    const matchesBin = docBin.startsWith(bin) || number.startsWith(bin);
+                    const matchesClasse = !classe || String(data.classe || '').toUpperCase() === classe.toUpperCase();
+                    const matchesBandeira = !bandeira || String(data.bandeira || '').toUpperCase() === bandeira.toUpperCase();
+                    return matchesBin && matchesClasse && matchesBandeira;
                 });
-            }).catch(err => {
-                console.error('buscarBin base error', err);
-                binResult.innerText = 'Erro ao buscar.';
-            });
 
-            function handleBinSnap(snap, binValue) {
-                if (snap.empty) {
+                if (!matches.length) {
                     const metaText = meta ? `${meta.brand || ''} • ${meta.country ? meta.country.name : ''}`.trim() : 'sem metadata';
-                    binResult.innerText = `BIN ${binValue} • ${metaText} • Estoque: 0`;
+                    binResult.innerText = `BIN ${bin} • ${metaText} • Estoque: 0`;
                     btnComprar.classList.add('hidden');
                     return;
                 }
-                const prices = snap.docs.map(d => d.data().price || 0);
-                const minPrice = prices.length ? Math.min(...prices) : 0;
-                currentBinPrice = minPrice;
+
+                const prices = matches.map(d => d.data().price || 0);
+                currentBinPrice = prices.length ? Math.min(...prices) : 0;
                 const metaText = meta ? `${meta.brand || ''} • ${meta.country ? meta.country.name : ''}`.trim() : 'sem metadata';
-                binResult.innerText = `BIN ${binValue} • ${metaText} • Estoque: ${snap.size} un. | Valor: R$ ${currentBinPrice.toFixed(2)}`;
+                binResult.innerText = `BIN ${bin} • ${metaText} • Estoque: ${matches.length} un. | Valor: R$ ${currentBinPrice.toFixed(2)}`;
                 btnComprar.classList.remove('hidden');
-                currentBinQuery = binValue;
+                currentBinQuery = bin;
+            } catch (err) {
+                console.error('buscarBin fallback error', err);
+                binResult.innerText = 'Erro ao buscar.';
+                btnComprar.classList.add('hidden');
             }
         }
 
@@ -387,24 +394,26 @@
                 return;
             }
             const data = historyData[currentHistoryIdx];
-            const num = String(data.numero || '0000000000000000').replace(/\D/g, '').slice(0, 16);
-            const numFmt = num.match(/.{1,4}/g).join(' ');
+            const nameText = safeText(data.name, 'SEM NOME').toUpperCase();
+            const expText = safeText(data.exp, '**/**');
+            const cvcText = safeText(data.cvc, '***');
+            const numFmt = formatCardNumber(data.numero);
             preview.innerHTML = `
                 <div class="cc-top">
                     <div class="cc-chip"></div>
-                    <div class="cc-brand">${(data.classe || 'CARD').toUpperCase()}</div>
+                    <div class="cc-brand">${safeText(data.classe, 'CARD').toUpperCase()}</div>
                 </div>
                 <div class="cc-number">${numFmt}</div>
-                <div class="cc-name">${(data.name || 'SEM NOME').toUpperCase()}</div>
+                <div class="cc-name">${nameText}</div>
                 <div class="cc-footer">
-                    <div><span>VALID</span><strong>${data.exp || '**/**'}</strong></div>
-                    <div><span>CVV</span><strong>${data.cvc || '***'}</strong></div>
+                    <div><span>VALID</span><strong>${expText}</strong></div>
+                    <div><span>CVV</span><strong>${cvcText}</strong></div>
                 </div>
                 <div class="cc-hint">Toque para copiar</div>
             `;
             count.innerText = `${currentHistoryIdx + 1} / ${historyData.length}`;
             prevBtn.disabled = historyData.length <= 1 || currentHistoryIdx >= historyData.length - 1;
-            nextBtn.disabled = historyData.length <= 1 || currentHistoryIdx === 0;
+            nextBtn.disabled = historyData.length <= 1 || currentHistoryIdx <= 0;
         }
 
         function renderHistoryList() {
@@ -416,7 +425,7 @@
                 card.className = `history-card${idx === currentHistoryIdx ? ' active' : ''}`;
                 const num = String(d.numero || '0000000000000000').replace(/\D/g, '').slice(0, 16);
                 const numFmt = num.match(/.{1,4}/g).join(' ');
-                card.innerHTML = `<div class="card-top"><div class="card-num">${numFmt}</div><div class="card-actions"><span>${d.classe || 'CARD'}</span></div></div><div class="card-body">${(d.name || 'SEM NOME').toUpperCase()} • ${d.exp || '**/**'}</div>`;
+                card.innerHTML = `<div class="card-top"><div class="card-num">${formatCardNumber(d.numero)}</div><div class="card-actions"><span>${safeText(d.classe, 'CARD').toUpperCase()}</span></div></div><div class="card-body">${safeText(d.name, 'SEM NOME').toUpperCase()} • ${safeText(d.exp, '**/**')}</div>`;
                 card.onclick = () => {
                     currentHistoryIdx = idx;
                     renderHistoryList();
@@ -516,7 +525,7 @@
 
         function navHistory(dir) {
             if (!historyData.length) return;
-            if (dir < 0) {
+            if (dir > 0) {
                 currentHistoryIdx = Math.min(historyData.length - 1, currentHistoryIdx + 1);
             } else {
                 currentHistoryIdx = Math.max(0, currentHistoryIdx - 1);
