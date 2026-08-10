@@ -148,7 +148,7 @@
         function loadStoreCache() {
             db.collection('store_db').where('status', '==', 'available').onSnapshot(snap => {
                 storeCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                buscarBinLive(); // Atualiza a tela se alguém pesquisou
+                buscarBinLive(); 
             });
         }
 
@@ -159,7 +159,6 @@
                 container.innerHTML = '';
                 snap.forEach(doc => {
                     const b = doc.data();
-                    // Renderiza o botão com o nome e preço, e passa as regras na função
                     container.innerHTML += `
                         <button class="button-primary" style="margin: 0;" onclick="comprarPorBotao('${b.titulo}', '${b.regra}', '${b.valorRegra}', ${b.preco})">
                             ${b.titulo} (R$ ${b.preco.toFixed(2)})
@@ -172,22 +171,18 @@
         function comprarPorBotao(titulo, regra, valor, preco) {
             if(currentSaldo < preco) return alert('Saldo insuficiente. Recarregue sua carteira.');
             
-            // Filtra os cartões disponíveis com base na regra que o Admin criou
             let matches = storeCache;
             const v = String(valor).toUpperCase();
             
             if(regra === 'PAIS') matches = matches.filter(c => String(c.pais).toUpperCase().includes(v));
             if(regra === 'CLASSE') matches = matches.filter(c => String(c.classe).toUpperCase().includes(v));
             if(regra === 'BANDEIRA') matches = matches.filter(c => String(c.bandeira).toUpperCase() === v);
-            // Se for MIX, não filtra, pega qualquer um.
             
             if(matches.length === 0) return alert('Nenhum cartão no estoque bate com os requisitos deste botão no momento.');
             
             if(!confirm(`Deseja comprar ${titulo} por R$ ${preco.toFixed(2)}?`)) return;
             
-            // Sorteia um dos cartões filtrados
             const item = matches[Math.floor(Math.random() * matches.length)];
-            
             const userCard = Object.assign({}, item, { boughtAt: firebase.firestore.FieldValue.serverTimestamp(), price: preco });
             
             db.collection('users').doc(currentUser.uid).collection('cards').add(userCard)
@@ -223,7 +218,6 @@
             const input = document.getElementById('bin-search').value.trim();
             const container = document.getElementById('live-search-results');
 
-            // Se não digitou nada, limpa a tela de resultados.
             if (!input) {
                 container.innerHTML = '<div style="text-align:center; font-size:11px; color:var(--text-main); margin-top:10px;">Comece a digitar para ver os cartões disponíveis no estoque.</div>';
                 return;
@@ -348,8 +342,8 @@
                 <div class="cc-number">${formatCardNumber(data.numero)}</div>
                 <div class="cc-name">${safeText(data.name, 'SEM NOME').toUpperCase()}</div>
                 <div class="cc-footer">
-                    <div><span>VALID</span><strong>${safeText(data.exp, '**/**')}</strong></div>
-                    <div><span>CVV</span><strong>${safeText(data.cvc, '***')}</strong></div>
+                    <div><span>VALID</span><br><strong>${safeText(data.exp, '**/**')}</strong></div>
+                    <div><span>CVV</span><br><strong>${safeText(data.cvc, '***')}</strong></div>
                 </div>
             `;
             count.innerText = `${currentHistoryIdx + 1} / ${historyData.length}`;
