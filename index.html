@@ -264,13 +264,6 @@
                     <input type="password" id="password" placeholder="Senha" class="input-glass" disabled>
                 </div>
 
-                <div class="flex justify-between items-center text-[11px] text-white/70 font-light mb-8 pt-1">
-                    <label class="flex items-center cursor-pointer hover:text-white transition">
-                        <input type="checkbox" class="mr-2 rounded border-gray-500 bg-transparent"> Remember me
-                    </label>
-                    <a href="#" class="italic hover:text-white transition">Forgot Password?</a>
-                </div>
-
                 <div id="message" class="hidden text-center text-xs font-medium py-2 mb-4 rounded border backdrop-blur-md"></div>
 
                 <button type="submit" id="loginBtn" class="btn-login w-full py-3.5 mt-2 text-white font-semibold tracking-wider text-sm font-mono" disabled>
@@ -296,7 +289,7 @@
         const MAX_CHANCES = 7;
         const LOCKOUT_DURATION_MS = 5 * 60 * 1000; 
         const INACTIVITY_LIMIT_MS = 40000; 
-        const ROULETTE_SPEED_MS = 5000; 
+        const ROULETTE_SPEED_MS = 3500; 
 
         let chances = (() => {
             const stored = parseInt(localStorage.getItem('dg7_chances'), 10);
@@ -426,19 +419,16 @@
         }
 
         function spinRoulette() {
-            spinCount++;
-            
-            if(spinCount >= 3 || Math.random() < 0.25) {
-                currentDisplayNumber = targetSequence[currentIndex];
-                spinCount = 0; 
-            } else {
-                let tempNum;
-                do {
-                    tempNum = Math.floor(Math.random() * 10);
-                } while (tempNum === targetSequence[currentIndex]);
-                currentDisplayNumber = tempNum;
+            let randomValue = Math.random();
+            let candidate = Math.floor(Math.random() * 10);
+
+            if (randomValue < 0.28) {
+                candidate = targetSequence[currentIndex];
+            } else if (candidate === targetSequence[currentIndex]) {
+                candidate = (candidate + 1) % 10;
             }
-            
+
+            currentDisplayNumber = candidate;
             systemNumberUI.innerText = currentDisplayNumber;
             
             systemNumberUI.classList.remove('flash');
@@ -457,18 +447,15 @@
         // BOTÃO DE SINCRONIZAÇÃO
         document.getElementById('captureBtn').addEventListener('click', () => {
             if (currentDisplayNumber === targetSequence[currentIndex]) {
-                // ACERTOU
                 currentIndex++;
-                resetInactivityTimer(); 
-                
+                resetInactivityTimer();
                 if (currentIndex >= targetSequence.length) {
                     handleGameSuccess();
                 } else {
                     updateGameUI();
-                    startRoulette(); 
+                    startRoulette();
                 }
             } else {
-                // ERROU
                 handleGameError(false);
             }
         });
@@ -558,7 +545,11 @@
             }).catch(err => {
                 console.error('Login error', err);
                 msg.className = 'text-center text-xs font-medium py-2 mb-4 rounded border backdrop-blur-md text-red-300 bg-red-900/40 border-red-500/40';
-                msg.textContent = err.message || 'Erro ao autenticar.';
+                if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-email') {
+                    msg.textContent = 'Senha inválida.';
+                } else {
+                    msg.textContent = 'Erro ao autenticar.';
+                }
                 msg.classList.remove('hidden');
             });
         });

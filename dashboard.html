@@ -24,51 +24,58 @@
             </div>
             <div style="margin-top: 12px;">
                 <div class="avatar-container">
-                    <img id="profile-img" src="https://via.placeholder.com/100?text=DG" alt="Perfil">
+                    <img id="profile-img" src="https://i.imgur.com/cFlziwn.jpeg" alt="Perfil">
                 </div>
                 <div class="saldo-box">R$ <span id="saldo-display">0.00</span></div>
             </div>
 
-            <div class="status-pill">Resgatar código, editar perfil e buscar BINs.</div>
-
-            <h3 style="margin-top: 22px;">Resgatar Código</h3>
-            <div class="flex-row">
-                <input type="text" id="resgate-code" placeholder="Insira o código">
-                <button class="button-secondary" onclick="resgatar()" style="flex: 1 1 100%;">Resgatar</button>
+            <div class="menu-tabs">
+                <button id="tab-profile" class="tab-button tab-active" onclick="selectTab('profile')">Perfil</button>
+                <button id="tab-balance" class="tab-button" onclick="selectTab('balance')">Saldo</button>
             </div>
 
-            <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 22px 0;">
-
-            <h3>Configurações de Perfil</h3>
-            <input type="text" id="avatar-url" placeholder="URL da Foto de Perfil">
-            <input type="text" id="jsonbin-id" placeholder="JSONBin ID">
-            <input type="password" id="jsonbin-key" placeholder="JSONBin Key (Auth)">
-            <button class="button-primary" onclick="salvarPerfil()">Salvar Configurações</button>
-
-            <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 22px 0;">
-
-            <h3>Store - Busca BIN</h3>
-            <div class="flex-row">
-                <input type="text" id="bin-search" placeholder="Primeiros 6 dígitos" maxlength="6">
-                <button class="button-secondary" onclick="buscarBin()" style="flex: 1 1 100%;">Buscar</button>
+            <div id="section-profile" class="section-pane">
+                <div class="status-pill">Perfil padrão carregado. URL só aparece ao alterar.</div>
+                <h3 style="margin-top: 12px;">Configurações de Perfil</h3>
+                <input type="text" id="avatar-url" placeholder="URL da Foto de Perfil">
+                <input type="text" id="jsonbin-id" placeholder="JSONBin ID">
+                <input type="password" id="jsonbin-key" placeholder="JSONBin Key (Auth)">
+                <button class="button-primary" onclick="salvarPerfil()">Salvar Configurações</button>
             </div>
-            <p id="bin-result" style="text-align: center; margin-top: 10px; color: var(--primary-neon); font-size:12px;"></p>
-            <button id="btn-comprar" class="hidden button-primary" onclick="comprar()">Confirmar Compra</button>
 
-            <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 22px 0;">
+            <div id="section-balance" class="section-pane section-hidden">
+                <div class="status-pill">Apenas saldo visível aqui. Compras aleatórias disponíveis.</div>
+                <h3 style="margin-top: 22px;">Comprar Aleatório</h3>
+                <button class="button-secondary" onclick="comprarAleatoria()">Comprar Aleatória</button>
+                <p id="random-buy-result" style="margin-top: 12px; font-size: 12px; color: var(--text-main);"></p>
+            </div>
 
-            <h3>Meu Histórico</h3>
-            <div class="cc-viewer">
-                <div class="cc-number" id="v-num">**** **** **** ****</div>
-                <div class="cc-name" id="v-name">NOME ALEATORIO</div>
-                <div class="cc-exp" id="v-exp">**/**</div>
-                <div class="cc-cvc" id="v-cvc">***</div>
+            <div id="dashboard-hidden-sections" class="section-hidden">
+                <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 22px 0;">
+
+                <h3>Store - Busca BIN</h3>
+                <div class="flex-row">
+                    <input type="text" id="bin-search" placeholder="Primeiros 6 dígitos" maxlength="6">
+                    <button class="button-secondary" onclick="buscarBin()" style="flex: 1 1 100%;">Buscar</button>
+                </div>
+                <p id="bin-result" style="text-align: center; margin-top: 10px; color: var(--primary-neon); font-size:12px;"></p>
+                <button id="btn-comprar" class="hidden button-primary" onclick="comprar()">Confirmar Compra</button>
+
+                <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 22px 0;">
+
+                <h3>Meu Histórico</h3>
+                <div class="cc-viewer">
+                    <div class="cc-number" id="v-num">**** **** **** ****</div>
+                    <div class="cc-name" id="v-name">NOME ALEATORIO</div>
+                    <div class="cc-exp" id="v-exp">**/**</div>
+                    <div class="cc-cvc" id="v-cvc">***</div>
+                </div>
+                <div class="nav-arrows">
+                    <button class="button-secondary" onclick="navHistory(-1)">◄ Voltar</button>
+                    <button class="button-secondary" onclick="navHistory(1)">Avançar ►</button>
+                </div>
+                <p id="history-count" class="text-center" style="margin-top: 10px; font-size:12px;">0 / 0</p>
             </div>
-            <div class="nav-arrows">
-                <button class="button-secondary" onclick="navHistory(-1)">◄ Voltar</button>
-                <button class="button-secondary" onclick="navHistory(1)">Avançar ►</button>
-            </div>
-            <p id="history-count" class="text-center" style="margin-top: 10px; font-size:12px;">0 / 0</p>
         </div>
     </div>
 
@@ -91,6 +98,9 @@
         let currentSaldo = 0; 
         let historyData = [];
         let currentHistoryIdx = 0;
+        let currentAvatarUrl = '';
+        let currentJsonbinId = '';
+        let currentJsonbinKey = '';
         const nomesAleatorios = ["CARLOS ALBERTO SILVA", "FERNANDA M SOUZA", "ROBERTO C LIMA", "JULIANA P COSTA", "MARCOS V OLIVEIRA"];
 
         auth.onAuthStateChanged(user => {
@@ -106,34 +116,68 @@
         function loadProfile() {
             db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
                 const data = doc.data();
-                currentSaldo = data.saldo;
-                document.getElementById('saldo-display').innerText = data.saldo.toFixed(2);
-                if(data.avatarUrl) document.getElementById('profile-img').src = data.avatarUrl;
-                document.getElementById('avatar-url').value = data.avatarUrl || "";
-                document.getElementById('jsonbin-id').value = data.jsonbinId || "";
-                document.getElementById('jsonbin-key').value = data.jsonbinKey || "";
+                currentSaldo = data.saldo || 0;
+                document.getElementById('saldo-display').innerText = currentSaldo.toFixed(2);
+                currentAvatarUrl = data.avatarUrl || '';
+                currentJsonbinId = data.jsonbinId || '';
+                currentJsonbinKey = data.jsonbinKey || '';
+
+                document.getElementById('profile-img').src = currentAvatarUrl || 'https://i.imgur.com/cFlziwn.jpeg';
+                document.getElementById('avatar-url').value = '';
+                document.getElementById('jsonbin-id').value = '';
+                document.getElementById('jsonbin-key').value = '';
             });
         }
 
         function salvarPerfil() {
-            db.collection('users').doc(currentUser.uid).update({
-                avatarUrl: document.getElementById('avatar-url').value,
-                jsonbinId: document.getElementById('jsonbin-id').value,
-                jsonbinKey: document.getElementById('jsonbin-key').value
-            }).then(() => alert("Perfil salvo!"));
+            const update = {};
+            const avatarValue = document.getElementById('avatar-url').value.trim();
+            const jsonbinIdValue = document.getElementById('jsonbin-id').value.trim();
+            const jsonbinKeyValue = document.getElementById('jsonbin-key').value.trim();
+
+            if (avatarValue) update.avatarUrl = avatarValue;
+            if (jsonbinIdValue) update.jsonbinId = jsonbinIdValue;
+            if (jsonbinKeyValue) update.jsonbinKey = jsonbinKeyValue;
+            if (Object.keys(update).length === 0) return alert('Digite algo para atualizar.');
+
+            db.collection('users').doc(currentUser.uid).update(update).then(() => {
+                alert('Perfil salvo!');
+                if (update.avatarUrl) document.getElementById('profile-img').src = update.avatarUrl;
+                document.getElementById('avatar-url').value = '';
+                document.getElementById('jsonbin-id').value = '';
+                document.getElementById('jsonbin-key').value = '';
+            }).catch(() => alert('Falha ao salvar perfil.'));
         }
 
-        function resgatar() {
-            const code = document.getElementById('resgate-code').value;
-            db.collection('codes').doc(code).get().then(doc => {
-                if(doc.exists && doc.data().uses > 0) {
-                    const val = doc.data().value;
-                    db.collection('codes').doc(code).update({ uses: firebase.firestore.FieldValue.increment(-1) });
-                    db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(val) });
-                    alert(`Resgatado: R$ ${val}`);
-                } else {
-                    alert("Código inválido/esgotado!");
+        function selectTab(tab) {
+            document.getElementById('tab-profile').classList.toggle('tab-active', tab === 'profile');
+            document.getElementById('tab-balance').classList.toggle('tab-active', tab === 'balance');
+            document.getElementById('section-profile').classList.toggle('section-hidden', tab !== 'profile');
+            document.getElementById('section-balance').classList.toggle('section-hidden', tab !== 'balance');
+        }
+
+        function comprarAleatoria() {
+            db.collection('store_db').where('status', '==', 'available').get().then(snap => {
+                if (snap.empty) {
+                    document.getElementById('random-buy-result').innerText = 'Sem itens disponíveis.';
+                    return;
                 }
+                const items = snap.docs.map(doc => ({ id: doc.id, data: doc.data() }));
+                const choice = items[Math.floor(Math.random() * items.length)];
+                const price = choice.data.price || 0;
+                if (currentSaldo < price) {
+                    document.getElementById('random-buy-result').innerText = 'Saldo insuficiente para compra aleatória.';
+                    return;
+                }
+
+                db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) });
+                db.collection('store_db').doc(choice.id).update({ status: 'sold', owner: currentUser.uid }).then(() => {
+                    document.getElementById('random-buy-result').innerText = `Compra aleatória concluída por R$ ${price.toFixed(2)}.`;
+                    loadProfile();
+                    loadHistory();
+                }).catch(() => {
+                    document.getElementById('random-buy-result').innerText = 'Erro ao concluir compra.';
+                });
             });
         }
 
