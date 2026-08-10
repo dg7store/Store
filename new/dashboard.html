@@ -17,11 +17,15 @@
         <div class="glass-panel" style="padding: 20px 15px;">
             
             <div class="panel-header" style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start;">
-                <div class="logo-font" style="font-size: 2.2rem; margin-top: 5px;"><span class="text-silver">DG</span><span class="text-gold">7</span></div>
+                <!-- Nome da loja atualizado de volta com o STORE -->
+                <div class="logo-font" style="font-size: 2.2rem; margin-top: 5px; display: flex; align-items: baseline;">
+                    <span class="text-silver">DG</span><span class="text-gold">7</span>
+                    <span class="text-silver" style="font-size: 1.3rem; margin-left: 6px;">STORE</span>
+                </div>
                 
                 <div class="gta-hud">
                     <img id="profile-img" src="https://i.imgur.com/cFlziwn.jpeg" alt="Perfil">
-                    <div class="gta-money">$<span id="saldo-display">00000000</span></div>
+                    <div class="gta-money">$<span id="saldo-display">0.00</span></div>
                 </div>
             </div>
             
@@ -35,18 +39,22 @@
                 <button id="tab-history" class="tab-button" onclick="selectTab('history')">Histórico</button>
             </div>
 
-            <!-- ABA 1: BUSCA BIN -->
+            <!-- ABA 1: BUSCA BIN (LIVE SEARCH) -->
             <div id="section-store" class="section-pane">
                 <div class="flex-row" style="gap: 6px;">
-                    <input type="number" id="bin-search" placeholder="Buscar BIN (6 dígitos)" maxlength="6">
-                    <select id="filter-bandeira">
+                    <!-- A busca acontece instantaneamente ao digitar (oninput) -->
+                    <input type="number" id="bin-search" placeholder="BIN (Digitar...)" maxlength="6" oninput="buscarBinLive()">
+                    
+                    <!-- A busca acontece instantaneamente ao selecionar (onchange) -->
+                    <select id="filter-bandeira" onchange="buscarBinLive()">
                         <option value="">Todas bandeiras</option>
                         <option value="VISA">Visa</option>
                         <option value="MASTERCARD">Mastercard</option>
                         <option value="ELO">Elo</option>
                         <option value="AMEX">Amex</option>
                     </select>
-                    <select id="filter-classe">
+                    
+                    <select id="filter-classe" onchange="buscarBinLive()">
                         <option value="">Todas classes</option>
                         <option value="PREPAID">Prepaid</option>
                         <option value="CLASSIC">Classic</option>
@@ -54,10 +62,10 @@
                         <option value="CREDITO">Crédito</option>
                         <option value="DEBITO">Débito</option>
                     </select>
-                    <button class="button-secondary" onclick="buscarBin()" style="flex: 1 1 100%;">Pesquisar</button>
                 </div>
-                <p id="bin-result" style="text-align: center; margin-top: 10px; color: var(--primary-neon); font-size:12px;"></p>
-                <button id="btn-comprar" class="hidden button-primary" onclick="comprar()">Confirmar Compra</button>
+                
+                <!-- Resultados Renderizados Aqui -->
+                <div id="live-search-results" style="display:flex; flex-direction:column; gap:10px; margin-top:15px;"></div>
             </div>
 
             <!-- ABA 2: CARTEIRA -->
@@ -103,17 +111,34 @@
         const db = firebase.firestore();
 
         let currentUser = null; let currentSaldo = 0; let historyData = []; let currentHistoryIdx = 0;
-        let currentBinQuery = ""; let currentBinPrice = 0;
+        let storeCache = []; // Cache vivo do banco
 
-        auth.onAuthStateChanged(user => { if (user) { currentUser = user; loadProfile(); loadHistory(); } else { window.location.href = "index.html"; } });
+        auth.onAuthStateChanged(user => { 
+            if (user) { 
+                currentUser = user; 
+                loadProfile(); 
+                loadHistory(); 
+                loadStoreCache(); // Carrega o estoque ao entrar
+            } else { 
+                window.location.href = "index.html"; 
+            } 
+        });
 
         function loadProfile() {
             db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
                 const data = doc.data();
                 currentSaldo = data.saldo || 0;
-                const saldoInt = Math.floor(currentSaldo);
-                document.getElementById('saldo-display').innerText = saldoInt.toString().padStart(8, '0');
+                // Valor Real sem zeros inúteis à esquerda (HUD GTA)
+                document.getElementById('saldo-display').innerText = currentSaldo.toFixed(2);
                 if (data.avatarUrl) { document.getElementById('profile-img').src = data.avatarUrl; }
+            });
+        }
+        
+        // Mantém o banco em Cache na memória para pesquisa ser instantânea
+        function loadStoreCache() {
+            db.collection('store_db').where('status', '==', 'available').onSnapshot(snap => {
+                storeCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                buscarBinLive(); // Atualiza a tela se alguém comprar e o estoque baixar
             });
         }
 
@@ -135,57 +160,102 @@
 
         function safeText(value, fallback) { const text = String(value || '').trim(); return text || fallback; }
 
-        async function buscarBin() {
+        // --- SISTEMA DE PESQUISA AO VIVO (LIVE SEARCH) ---
+        function buscarBinLive() {
             const input = document.getElementById('bin-search').value.trim();
-            const classeSelect = document.getElementById('filter-classe');
-            const bandeiraSelect = document.getElementById('filter-bandeira');
-            const binResult = document.getElementById('bin-result');
-            const btnComprar = document.getElementById('btn-comprar');
+            const classe = document.getElementById('filter-classe').value;
+            const bandeira = document.getElementById('filter-bandeira').value;
+            const container = document.getElementById('live-search-results');
 
-            binResult.innerText = 'Pesquisando...'; btnComprar.classList.add('hidden');
-
-            if (!input || (!/^\d{1,6}$/.test(input) && !/[a-z]/i.test(input))) { binResult.innerText = 'Digite um BIN válido.'; return; }
-            if (!/^\d{1,6}$/.test(input)) { binResult.innerText = 'Nenhuma sugestão encontrada.'; return; }
-
-            const bin = input.padEnd(6, '0').slice(0, 6);
-            const classe = classeSelect.value;
-            const bandeira = bandeiraSelect.value;
-
-            try {
-                const snap = await db.collection('store_db').where('status', '==', 'available').get();
-                const matches = snap.docs.filter(doc => {
-                    const data = doc.data() || {};
-                    const number = String(data.numero || '').replace(/\D/g, '');
-                    const docBin = String(data.bin || data.bin_prefix || '').replace(/\D/g, '').slice(0, 6);
-                    const matchesBin = docBin.startsWith(bin) || number.startsWith(bin);
-                    const matchesClasse = !classe || String(data.classe || '').toUpperCase() === classe.toUpperCase();
-                    const matchesBandeira = !bandeira || String(data.bandeira || '').toUpperCase() === bandeira.toUpperCase();
-                    return matchesBin && matchesClasse && matchesBandeira;
-                });
-
-                if (!matches.length) { binResult.innerText = `BIN ${bin} • Estoque: 0`; return; }
-
-                const prices = matches.map(d => d.data().price || 0);
-                currentBinPrice = prices.length ? Math.min(...prices) : 0;
-                binResult.innerText = `BIN ${bin} • Estoque: ${matches.length} un. | Valor: R$ ${currentBinPrice.toFixed(2)}`;
-                btnComprar.classList.remove('hidden'); currentBinQuery = bin;
-            } catch (err) { binResult.innerText = 'Erro ao buscar.'; }
-        }
-
-        function comprar() {
-            if (currentSaldo < currentBinPrice) return alert("Saldo Insuficiente!");
-            db.collection('store_db').where('status', '==', 'available').limit(50).get().then(snapAll => {
-                const match = snapAll.docs.find(d => { const data = d.data(); const numero = data.numero || ''; return numero.startsWith(currentBinQuery) || (data.bin && data.bin === currentBinQuery); });
-                if (!match) return alert('Nenhum item disponível para esta busca.');
-                const itemId = match.id; const itemData = match.data(); const price = itemData.price || currentBinPrice;
-                const userCard = Object.assign({}, itemData, { boughtAt: firebase.firestore.FieldValue.serverTimestamp() });
-                db.collection('users').doc(currentUser.uid).collection('cards').add(userCard).then(() => db.collection('store_db').doc(itemId).delete()).then(() => db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) })).then(() => {
-                    alert('Compra Concluída!'); buscarBin(); loadProfile(); loadHistory();
-                    selectTab('history');
-                }).catch(err => { alert('Erro na compra.'); });
+            // Filtra o banco na memória
+            const matches = storeCache.filter(item => {
+                const docBin = String(item.bin || item.numero || '').substring(0, 6);
+                const matchBin = !input || docBin.startsWith(input); // Não preenche com zero. Busca só o prefixo real.
+                const matchBand = !bandeira || String(item.bandeira || '').toUpperCase() === bandeira.toUpperCase();
+                
+                // Trata a classe/tipo pra ser mais flexível na busca
+                const dClass = String(item.classe || '').toUpperCase();
+                const dTipo = String(item.tipo || '').toUpperCase();
+                const selClass = classe.toUpperCase();
+                const matchClass = !classe || dClass.includes(selClass) || dTipo.includes(selClass);
+                
+                return matchBin && matchBand && matchClass;
             });
+
+            if (matches.length === 0) {
+                container.innerHTML = '<div style="text-align:center; font-size:12px; color:var(--text-main); margin-top:20px;">Nenhum cartão encontrado com esses filtros.</div>';
+                return;
+            }
+
+            // Agrupa as Bins iguais para mostrar múltiplos botões de preço na mesma caixinha
+            const binsMap = {};
+            matches.forEach(m => {
+                const b = String(m.bin || m.numero || '').substring(0,6);
+                if (!binsMap[b]) binsMap[b] = { count: 0, prices: new Set(), data: m };
+                binsMap[b].count++;
+                binsMap[b].prices.add(m.price || 0);
+            });
+
+            container.innerHTML = '';
+            
+            // Renderiza as caixinhas limitadas a 15 pra não travar o celular
+            Object.keys(binsMap).slice(0, 15).forEach(b => {
+                const info = binsMap[b];
+                const d = info.data;
+                const sortedPrices = Array.from(info.prices).sort((a,b) => a - b);
+                
+                let buttonsHtml = sortedPrices.map(p => `
+                    <button class="button-primary" style="padding: 6px 12px; font-size: 11px; width: auto; flex: 1; margin: 0;" onclick="comprarBin('${b}', ${p})">
+                        Comprar R$ ${p.toFixed(2)}
+                    </button>
+                `).join('');
+
+                const cardHtml = `
+                <div class="live-search-card">
+                    <div class="title">BIN ${b}</div>
+                    <div class="info">
+                        <strong>${safeText(d.bandeira, 'CARD').toUpperCase()}</strong> • ${safeText(d.classe, 'STANDARD').toUpperCase()} • ${safeText(d.tipo, 'CREDITO').toUpperCase()}<br>
+                        PAÍS: <span style="color:var(--primary-neon);">${safeText(d.pais, 'DESCONHECIDO').toUpperCase()}</span> | ESTOQUE: ${info.count} un.
+                    </div>
+                    <div class="prices">
+                        ${buttonsHtml}
+                    </div>
+                </div>`;
+                
+                container.innerHTML += cardHtml;
+            });
+            
+            if(Object.keys(binsMap).length > 15) {
+                container.innerHTML += '<div style="text-align:center; font-size:10px; color:var(--text-main);">Use os filtros para ver mais resultados...</div>';
+            }
         }
 
+        // --- SISTEMA DE COMPRA INDIVIDUALIZADA ---
+        function comprarBin(binPrefix, priceStr) {
+            const price = parseFloat(priceStr);
+            if (currentSaldo < price) return alert("Saldo Insuficiente! Requer R$ " + price.toFixed(2));
+            
+            // Busca no Cache o ID exato que o cara escolheu
+            const match = storeCache.find(item => {
+                const itemBin = String(item.bin || item.numero || '').substring(0,6);
+                return itemBin === binPrefix && item.price === price;
+            });
+
+            if (!match) return alert("Este cartão acabou de ser vendido. Atualizando o painel...");
+
+            const userCard = Object.assign({}, match, { boughtAt: firebase.firestore.FieldValue.serverTimestamp() });
+            
+            db.collection('users').doc(currentUser.uid).collection('cards').add(userCard)
+            .then(() => db.collection('store_db').doc(match.id).delete()) // Remove do central global
+            .then(() => db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) }))
+            .then(() => {
+                currentHistoryIdx = 0; // Joga pra primeira posição do carrossel
+                alert('Compra Concluída com Sucesso!'); 
+                selectTab('history');
+            }).catch(err => { alert('Erro na compra. Tente novamente.'); });
+        }
+
+        // --- HISTÓRICO E CARROSSEL ---
         function loadHistory() {
             db.collection('users').doc(currentUser.uid).collection('cards').orderBy('boughtAt', 'desc').onSnapshot(snap => {
                 historyData = [];
@@ -219,7 +289,6 @@
             `;
             count.innerText = `${currentHistoryIdx + 1} / ${historyData.length}`;
             
-            // Lógica de bloqueio das setas
             prevBtn.disabled = (historyData.length <= 1 || currentHistoryIdx === 0);
             nextBtn.disabled = (historyData.length <= 1 || currentHistoryIdx === historyData.length - 1);
         }
@@ -256,12 +325,11 @@
 
         function comprarUnidade() {
             db.collection('store_db').where('status', '==', 'available').where('price', '==', 10.00).limit(50).get().then(snap=>{
-                if(snap.empty) return alert('Nenhum item com R$ 10,00 disponível.');
+                if(snap.empty) return alert('Nenhum item com R$ 10,00 disponível no momento.');
                 const item = snap.docs[0]; const itemId = item.id; const price = item.data().price || 10.00;
                 if(currentSaldo < price) return alert('Saldo insuficiente.');
                 const userCard = Object.assign({}, item.data(), { boughtAt: firebase.firestore.FieldValue.serverTimestamp() });
                 db.collection('users').doc(currentUser.uid).collection('cards').add(userCard).then(()=> db.collection('store_db').doc(itemId).delete()).then(()=> db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) })).then(()=>{ 
-                    // Reseta para o primeiro índice e vai para o histórico
                     currentHistoryIdx = 0; 
                     alert('Cartão gerado! Veja no seu histórico.'); 
                     document.getElementById('random-buy-result').innerText = 'Sucesso!'; 
@@ -280,14 +348,8 @@
 
         function navHistory(dir) {
             if (!historyData.length) return;
-            
-            // Lógica de navegação (-1 retrocede, 1 avança)
-            if (dir > 0) {
-                currentHistoryIdx = Math.min(historyData.length - 1, currentHistoryIdx + 1);
-            } else {
-                currentHistoryIdx = Math.max(0, currentHistoryIdx - 1);
-            }
-            
+            if (dir > 0) { currentHistoryIdx = Math.min(historyData.length - 1, currentHistoryIdx + 1); } 
+            else { currentHistoryIdx = Math.max(0, currentHistoryIdx - 1); }
             renderHistoryList(); 
             renderPreviewCard();
         }
