@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DG7STORE - Painel</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -14,15 +15,20 @@
     <div class="vignette-overlay"></div>
     <div class="page-shell">
         <div class="glass-panel" style="padding: 20px 15px;">
-            <div class="panel-header" style="margin-bottom: 15px;">
-                <div class="logo-font"><span class="text-silver">DG</span><span class="text-gold">7</span><span class="text-silver">STORE</span></div>
+            
+            <div class="panel-header" style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start;">
+                <div class="logo-font" style="font-size: 2.2rem; margin-top: 5px;"><span class="text-silver">DG</span><span class="text-gold">7</span></div>
+                
+                <div class="gta-hud">
+                    <img id="profile-img" src="https://i.imgur.com/cFlziwn.jpeg" alt="Perfil">
+                    <div class="gta-money">$<span id="saldo-display">00000000</span></div>
+                </div>
             </div>
-            <div class="flex-row" style="align-items:center; margin-bottom: 20px; gap: 12px; justify-content: space-between;">
-                <div class="saldo-box" style="margin: 0; padding: 10px; font-size: 18px; flex: 1;">R$ <span id="saldo-display">0.00</span></div>
-                <button class="button-secondary" onclick="logout()" style="width:auto; padding: 10px 18px; margin: 0;">Sair</button>
+            
+            <div style="display:flex; justify-content:flex-start; margin-bottom: 15px;">
+                <button class="button-secondary" onclick="logout()" style="width:auto; padding: 6px 12px; font-size:10px;">Desconectar</button>
             </div>
 
-            <!-- Abas com a Busca (Store) como inicial -->
             <div class="menu-tabs" style="margin: 10px 0;">
                 <button id="tab-store" class="tab-button tab-active" onclick="selectTab('store')">Busca</button>
                 <button id="tab-balance" class="tab-button" onclick="selectTab('balance')">Carteira</button>
@@ -73,16 +79,19 @@
                     <button class="button-danger" onclick="limparHistorico()" style="width: auto; padding: 6px 10px; font-size: 10px; margin: 0;">Excluir Todos</button>
                 </div>
                 
-                <div id="card-preview" class="cc-preview-card" onclick="copiarCartaoAtual()" title="Toque para copiar"></div>
-                <p id="history-count" class="text-center" style="margin-bottom: 10px; font-size:12px;">0 / 0</p>
+                <p id="history-count" class="text-center" style="margin-bottom: 5px; font-size:12px; color: var(--primary-neon);">0 / 0</p>
                 
-                <!-- GRID 2 COLUNAS -->
-                <div id="history-list" class="history-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;"></div>
-                
-                <div class="nav-arrows">
-                    <button id="nav-prev" class="button-secondary" onclick="navHistory(-1)">◄</button>
-                    <button id="nav-next" class="button-secondary" onclick="navHistory(1)">►</button>
+                <!-- CARROSSEL COM SETAS LATERAIS -->
+                <div class="carousel-container">
+                    <button id="nav-prev" class="carousel-btn" onclick="navHistory(-1)"><i class="ph-bold ph-caret-left"></i></button>
+                    
+                    <div id="card-preview" class="cc-preview-card" onclick="copiarCartaoAtual()" title="Toque para copiar"></div>
+                    
+                    <button id="nav-next" class="carousel-btn" onclick="navHistory(1)"><i class="ph-bold ph-caret-right"></i></button>
                 </div>
+                
+                <!-- GRID 2 COLUNAS ABAIXO DO CARROSSEL -->
+                <div id="history-list" class="history-list"></div>
             </div>
         </div>
     </div>
@@ -102,7 +111,9 @@
             db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
                 const data = doc.data();
                 currentSaldo = data.saldo || 0;
-                document.getElementById('saldo-display').innerText = currentSaldo.toFixed(2);
+                const saldoInt = Math.floor(currentSaldo);
+                document.getElementById('saldo-display').innerText = saldoInt.toString().padStart(8, '0');
+                if (data.avatarUrl) { document.getElementById('profile-img').src = data.avatarUrl; }
             });
         }
 
@@ -124,11 +135,6 @@
 
         function safeText(value, fallback) { const text = String(value || '').trim(); return text || fallback; }
 
-        async function lookupBinMetadata(bin) {
-            if (!/^\d{6}$/.test(bin)) return null;
-            try { const response = await fetch(`https://lookup.binlist.net/${bin}`, { headers: { Accept: 'application/json' } }); if (!response.ok) throw new Error('offline'); return await response.json(); } catch (e) { return null; }
-        }
-
         async function buscarBin() {
             const input = document.getElementById('bin-search').value.trim();
             const classeSelect = document.getElementById('filter-classe');
@@ -142,8 +148,6 @@
             if (!/^\d{1,6}$/.test(input)) { binResult.innerText = 'Nenhuma sugestão encontrada.'; return; }
 
             const bin = input.padEnd(6, '0').slice(0, 6);
-            
-            // Não alteramos mais o select do usuário baseando-se no BIN. Ele pesquisa o que ele escolheu.
             const classe = classeSelect.value;
             const bandeira = bandeiraSelect.value;
 
@@ -177,6 +181,7 @@
                 const userCard = Object.assign({}, itemData, { boughtAt: firebase.firestore.FieldValue.serverTimestamp() });
                 db.collection('users').doc(currentUser.uid).collection('cards').add(userCard).then(() => db.collection('store_db').doc(itemId).delete()).then(() => db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) })).then(() => {
                     alert('Compra Concluída!'); buscarBin(); loadProfile(); loadHistory();
+                    selectTab('history');
                 }).catch(err => { alert('Erro na compra.'); });
             });
         }
@@ -185,15 +190,25 @@
             db.collection('users').doc(currentUser.uid).collection('cards').orderBy('boughtAt', 'desc').onSnapshot(snap => {
                 historyData = [];
                 snap.forEach(doc => { const d = doc.data(); d._id = doc.id; if (!d.name || d.name.trim() === '') { d.name = "NOME DESCONHECIDO"; } historyData.push(d); });
-                currentHistoryIdx = 0; renderHistoryList(); renderPreviewCard();
+                renderHistoryList(); renderPreviewCard();
             });
         }
 
         function renderPreviewCard() {
-            const preview = document.getElementById('card-preview'); const count = document.getElementById('history-count');
-            const prevBtn = document.getElementById('nav-prev'); const nextBtn = document.getElementById('nav-next');
+            const preview = document.getElementById('card-preview'); 
+            const count = document.getElementById('history-count');
+            const prevBtn = document.getElementById('nav-prev'); 
+            const nextBtn = document.getElementById('nav-next');
+            
             if (!preview) return;
-            if (historyData.length === 0) { preview.innerHTML = '<div class="cc-empty">Nenhum cartão comprado ainda.</div>'; count.innerText = '0 / 0'; prevBtn.disabled = true; nextBtn.disabled = true; return; }
+            if (historyData.length === 0) { 
+                preview.innerHTML = '<div class="cc-empty">Nenhum cartão comprado.</div>'; 
+                count.innerText = '0 / 0'; 
+                prevBtn.disabled = true; 
+                nextBtn.disabled = true; 
+                return; 
+            }
+            
             const data = historyData[currentHistoryIdx];
             preview.innerHTML = `
                 <div class="cc-top"><div class="cc-chip"></div><div class="cc-brand">${safeText(data.classe, 'CARD').toUpperCase()}</div></div>
@@ -203,8 +218,10 @@
                 <div class="cc-hint">Toque para copiar</div>
             `;
             count.innerText = `${currentHistoryIdx + 1} / ${historyData.length}`;
-            prevBtn.disabled = historyData.length <= 1 || currentHistoryIdx >= historyData.length - 1;
-            nextBtn.disabled = historyData.length <= 1 || currentHistoryIdx <= 0;
+            
+            // Lógica de bloqueio das setas
+            prevBtn.disabled = (historyData.length <= 1 || currentHistoryIdx === 0);
+            nextBtn.disabled = (historyData.length <= 1 || currentHistoryIdx === historyData.length - 1);
         }
 
         function renderHistoryList() {
@@ -228,24 +245,13 @@
             });
         }
 
-        function apagarCompra(docId) {
-            if(!confirm('Remover este item?')) return;
-            db.collection('users').doc(currentUser.uid).collection('cards').doc(docId).delete();
-        }
-
-        function limparHistorico() {
-            if(!confirm('Apagar todo o histórico de compras?')) return;
-            const batch = db.batch();
-            historyData.forEach(item => { const ref = db.collection('users').doc(currentUser.uid).collection('cards').doc(item._id); batch.delete(ref); });
-            batch.commit();
-        }
-
+        function apagarCompra(docId) { if(!confirm('Remover este item?')) return; db.collection('users').doc(currentUser.uid).collection('cards').doc(docId).delete().then(() => { currentHistoryIdx = 0; }); }
+        function limparHistorico() { if(!confirm('Apagar todo o histórico?')) return; const batch = db.batch(); historyData.forEach(item => { const ref = db.collection('users').doc(currentUser.uid).collection('cards').doc(item._id); batch.delete(ref); }); batch.commit().then(() => { currentHistoryIdx = 0; }); }
+        
         function copiarCartaoAtual() {
             if (!historyData.length) return; const data = historyData[currentHistoryIdx];
             const text = `Número: ${data.numero || ''}\nExp: ${data.exp || ''}\nCVC: ${data.cvc || ''}\nBIN: ${data.bin || ''}`;
-            navigator.clipboard.writeText(text).then(() => {
-                const preview = document.getElementById('card-preview'); preview.classList.add('copied'); setTimeout(() => preview.classList.remove('copied'), 900);
-            });
+            navigator.clipboard.writeText(text).then(() => { const preview = document.getElementById('card-preview'); preview.classList.add('copied'); setTimeout(() => preview.classList.remove('copied'), 900); });
         }
 
         function comprarUnidade() {
@@ -254,7 +260,13 @@
                 const item = snap.docs[0]; const itemId = item.id; const price = item.data().price || 10.00;
                 if(currentSaldo < price) return alert('Saldo insuficiente.');
                 const userCard = Object.assign({}, item.data(), { boughtAt: firebase.firestore.FieldValue.serverTimestamp() });
-                db.collection('users').doc(currentUser.uid).collection('cards').add(userCard).then(()=> db.collection('store_db').doc(itemId).delete()).then(()=> db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) })).then(()=>{ alert('Compra concluída.'); document.getElementById('random-buy-result').innerText = 'Sucesso!'; });
+                db.collection('users').doc(currentUser.uid).collection('cards').add(userCard).then(()=> db.collection('store_db').doc(itemId).delete()).then(()=> db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) })).then(()=>{ 
+                    // Reseta para o primeiro índice e vai para o histórico
+                    currentHistoryIdx = 0; 
+                    alert('Cartão gerado! Veja no seu histórico.'); 
+                    document.getElementById('random-buy-result').innerText = 'Sucesso!'; 
+                    selectTab('history');
+                });
             });
         }
 
@@ -268,9 +280,16 @@
 
         function navHistory(dir) {
             if (!historyData.length) return;
-            if (dir > 0) currentHistoryIdx = Math.min(historyData.length - 1, currentHistoryIdx + 1);
-            else currentHistoryIdx = Math.max(0, currentHistoryIdx - 1);
-            renderHistoryList(); renderPreviewCard();
+            
+            // Lógica de navegação (-1 retrocede, 1 avança)
+            if (dir > 0) {
+                currentHistoryIdx = Math.min(historyData.length - 1, currentHistoryIdx + 1);
+            } else {
+                currentHistoryIdx = Math.max(0, currentHistoryIdx - 1);
+            }
+            
+            renderHistoryList(); 
+            renderPreviewCard();
         }
 
         function logout() { auth.signOut(); }
