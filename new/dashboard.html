@@ -360,8 +360,41 @@
             navigator.clipboard.writeText(text).then(() => { const preview = document.getElementById('card-preview'); preview.classList.add('copied'); setTimeout(() => preview.classList.remove('copied'), 900); });
         }
         function resgatarCodigo() {
-            const code = document.getElementById('resgate-codigo').value.trim(); if(!code) return alert('Digite um código.');
-            db.collection('codes').doc(code).get().then(snap => { if(!snap.exists) return alert('Código inválido.'); db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(snap.data().value || 0) }).then(()=> { alert('Resgatado!'); document.getElementById('resgate-codigo').value = ''; }); });
+            const code = document.getElementById('resgate-codigo').value.trim();
+            if (!code) return alert('Digite um código.');
+
+            const userRef = db.collection('users').doc(currentUser.uid);
+            const codeRef = db.collection('codes').doc(code);
+
+            db.runTransaction(async transaction => {
+                const snap = await transaction.get(codeRef);
+                if (!snap.exists) throw new Error('Código inválido.');
+
+                const data = snap.data() || {};
+                const remainingUses = Number(data.remainingUses ?? data.uses ?? 0);
+                const value = Number(data.value || 0);
+
+                if (data.status && data.status !== 'active') throw new Error('Código já foi utilizado ou está inativo.');
+                if (!Number.isFinite(remainingUses) || remainingUses <= 0) throw new Error('Código sem usos restantes.');
+
+                transaction.update(codeRef, {
+                    remainingUses: firebase.firestore.FieldValue.increment(-1),
+                    lastUsedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                if (remainingUses === 1) {
+                    transaction.update(codeRef, { status: 'used' });
+                }
+
+                transaction.update(userRef, { saldo: firebase.firestore.FieldValue.increment(value) });
+                return value;
+            }).then(value => {
+                alert(`Resgatado com sucesso! Seu saldo foi creditado em R$ ${Number(value).toFixed(2)}.`);
+                document.getElementById('resgate-codigo').value = '';
+            }).catch(err => {
+                const message = err && err.message ? err.message : 'Não foi possível resgatar o código.';
+                alert(message);
+            });
         }
         function navHistory(dir) {
             if (!historyData.length) return;

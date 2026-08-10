@@ -67,6 +67,7 @@
           </div>
           <button class="button-primary" onclick="generateCode()" style="padding: 12px;">Gerar Código</button>
           <div id="generation-status" class="status-pill" style="margin-top: 10px;">Pronto para gerar.</div>
+          <div id="generated-code" style="margin-top: 10px; font-size: 13px; font-weight: bold; color: var(--primary-neon); word-break: break-all;"></div>
       </div>
   </div>
 
@@ -418,7 +419,13 @@
       if (!Number.isFinite(val) || val <= 0 || !Number.isInteger(uses) || uses <= 0) { statusBox.innerText = 'Preencha os valores.'; return alert('Preencha valor e usos válidos.'); }
       const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let code = 'DG7-'; for (let i = 0; i < 8; i++) code += charset.charAt(Math.floor(Math.random() * charset.length));
       outputBox.innerText = code; statusBox.innerText = 'Código gravado com sucesso.';
-      db.collection('codes').doc(code).set({ value: val, uses, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(err => { statusBox.innerText = 'Falha no servidor.'; });
+      db.collection('codes').doc(code).set({
+        value: val,
+        uses,
+        remainingUses: uses,
+        status: 'active',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(err => { statusBox.innerText = 'Falha no servidor.'; });
     }
   </script>
 </body>
