@@ -84,10 +84,11 @@
                     <button class="button-secondary" onclick="downloadHistoryTxt()">Baixar histórico (.txt)</button>
                     <button class="button-secondary" onclick="exibirTodosCards()">Mostrar todos</button>
                 </div>
-                <div class="cc-viewer" id="history-list"></div>
+                <div id="card-preview" class="cc-preview-card" onclick="copiarCartaoAtual()" title="Toque para copiar"></div>
+                <div id="history-list" class="history-list"></div>
                 <div class="nav-arrows">
-                    <button class="button-secondary" onclick="navHistory(-1)">◄ Voltar</button>
-                    <button class="button-secondary" onclick="navHistory(1)">Avançar ►</button>
+                    <button id="nav-prev" class="button-secondary" onclick="navHistory(-1)">◄ Anterior</button>
+                    <button id="nav-next" class="button-secondary" onclick="navHistory(1)">Próximo ►</button>
                 </div>
                 <p id="history-count" class="text-center" style="margin-top: 10px; font-size:12px;">0 / 0</p>
             </div>
@@ -117,6 +118,11 @@
         let currentJsonbinId = '';
         let currentJsonbinKey = '';
         const nomesAleatorios = ["CARLOS ALBERTO SILVA", "FERNANDA M SOUZA", "ROBERTO C LIMA", "JULIANA P COSTA", "MARCOS V OLIVEIRA"];
+        const binSuggestions = {
+            visa: ['411111', '424242', '426984', '455673', '492183'],
+            mastercard: ['510000', '518000', '529999', '542000', '553000'],
+            amex: ['340000', '370000', '378282', '379999']
+        };
 
         auth.onAuthStateChanged(user => {
             if (user) {
@@ -199,17 +205,85 @@
         let currentBinQuery = "";
         let currentBinPrice = 0;
 
-        function buscarBin() {
-            const bin = document.getElementById('bin-search').value.trim();
-            if (!/^[0-9]{1,6}$/.test(bin)) {
-                document.getElementById('bin-result').innerText = "Digite até 6 dígitos numéricos.";
+        function getClasseFromBin(bin, meta) {
+            const brand = (meta && meta.brand ? meta.brand : '').toLowerCase();
+            const scheme = (meta && meta.scheme ? meta.scheme : '').toLowerCase();
+            const number = String(bin).trim();
+            if (number.startsWith('34') || number.startsWith('37')) return 'AMEX';
+            if (number.startsWith('4')) return 'VISA';
+            if (number.startsWith('5')) return 'MASTERCARD';
+            if (brand.includes('visa') || scheme.includes('visa')) return 'VISA';
+            if (brand.includes('mastercard') || scheme.includes('mastercard')) return 'MASTERCARD';
+            if (brand.includes('amex') || scheme.includes('amex')) return 'AMEX';
+            return '';
+        }
+
+        function getBandeiraFromBin(meta) {
+            const country = meta && meta.country ? meta.country.alpha2 : '';
+            return country === 'BR' ? 'NACIONAL' : 'INTERNACIONAL';
+        }
+
+        async function lookupBinMetadata(bin) {
+            if (!/^\d{6}$/.test(bin)) return null;
+            try {
+                const response = await fetch(`https://lookup.binlist.net/${bin}`, { headers: { Accept: 'application/json' } });
+                if (!response.ok) throw new Error('offline');
+                return await response.json();
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function showSuggestedBins(query) {
+            const normalized = query.toLowerCase();
+            const found = [];
+            if (normalized.includes('visa')) found.push(...binSuggestions.visa);
+            if (normalized.includes('master') || normalized.includes('mastercard')) found.push(...binSuggestions.mastercard);
+            if (normalized.includes('amex')) found.push(...binSuggestions.amex);
+            if (found.length) {
+                document.getElementById('bin-result').innerText = `Sugestões: ${found.join(', ')}`;
                 document.getElementById('btn-comprar').classList.add('hidden');
+                return true;
+            }
+            return false;
+        }
+
+        async function buscarBin() {
+            const input = document.getElementById('bin-search').value.trim();
+            const classeSelect = document.getElementById('filter-classe');
+            const bandeiraSelect = document.getElementById('filter-bandeira');
+            const binResult = document.getElementById('bin-result');
+            const btnComprar = document.getElementById('btn-comprar');
+
+            if (!input) {
+                binResult.innerText = 'Digite um BIN ou uma classe (Visa/Mastercard/Amex).';
+                btnComprar.classList.add('hidden');
                 return;
             }
-            const classe = document.getElementById('filter-classe').value;
-            const bandeira = document.getElementById('filter-bandeira').value;
 
-            // Primeiro tente buscar por campo 'bin' exato (se o DB usar isso)
+            if (!/^\d{1,6}$/.test(input) && !/[a-z]/i.test(input)) {
+                binResult.innerText = 'Digite até 6 dígitos ou uma classe como Visa/Mastercard/Amex.';
+                btnComprar.classList.add('hidden');
+                return;
+            }
+
+            if (!/^\d{1,6}$/.test(input)) {
+                if (showSuggestedBins(input)) return;
+                binResult.innerText = 'Nenhuma sugestão encontrada.';
+                btnComprar.classList.add('hidden');
+                return;
+            }
+
+            const bin = input.padEnd(6, '0').slice(0, 6);
+            const meta = await lookupBinMetadata(bin);
+            const detectedClasse = getClasseFromBin(bin, meta);
+            const detectedBandeira = getBandeiraFromBin(meta);
+            if (detectedClasse) classeSelect.value = detectedClasse;
+            if (detectedBandeira) bandeiraSelect.value = detectedBandeira;
+
+            const classe = classeSelect.value;
+            const bandeira = bandeiraSelect.value;
+
             let baseQuery = db.collection('store_db').where('status', '==', 'available').where('bin', '==', bin);
             if (classe) baseQuery = baseQuery.where('classe', '==', classe);
             if (bandeira) baseQuery = baseQuery.where('bandeira', '==', bandeira);
@@ -217,7 +291,6 @@
             baseQuery.get().then(snap => {
                 if (!snap.empty) return handleBinSnap(snap, bin);
 
-                // Caso não haja 'bin' exato, pesquise prefixo em 'numero' usando range
                 const start = bin;
                 const end = bin + '\uf8ff';
                 let prefixQuery = db.collection('store_db').where('status', '==', 'available').where('numero', '>=', start).where('numero', '<=', end);
@@ -225,25 +298,26 @@
                 if (bandeira) prefixQuery = prefixQuery.where('bandeira', '==', bandeira);
                 prefixQuery.get().then(snap2 => handleBinSnap(snap2, bin)).catch(err => {
                     console.error('buscarBin prefix error', err);
-                    document.getElementById('bin-result').innerText = 'Erro ao buscar prefixo.';
+                    binResult.innerText = 'Erro ao buscar prefixo.';
                 });
             }).catch(err => {
                 console.error('buscarBin base error', err);
-                document.getElementById('bin-result').innerText = "Erro ao buscar.";
+                binResult.innerText = 'Erro ao buscar.';
             });
 
             function handleBinSnap(snap, binValue) {
                 if (snap.empty) {
-                    document.getElementById('bin-result').innerText = 'Estoque: 0';
-                    document.getElementById('btn-comprar').classList.add('hidden');
+                    const metaText = meta ? `${meta.brand || ''} • ${meta.country ? meta.country.name : ''}`.trim() : 'sem metadata';
+                    binResult.innerText = `BIN ${binValue} • ${metaText} • Estoque: 0`;
+                    btnComprar.classList.add('hidden');
                     return;
                 }
-                // use menor preço encontrado e conte unidades
                 const prices = snap.docs.map(d => d.data().price || 0);
                 const minPrice = prices.length ? Math.min(...prices) : 0;
                 currentBinPrice = minPrice;
-                document.getElementById('bin-result').innerText = `Estoque: ${snap.size} un. | Valor: R$ ${currentBinPrice.toFixed(2)}`;
-                document.getElementById('btn-comprar').classList.remove('hidden');
+                const metaText = meta ? `${meta.brand || ''} • ${meta.country ? meta.country.name : ''}`.trim() : 'sem metadata';
+                binResult.innerText = `BIN ${binValue} • ${metaText} • Estoque: ${snap.size} un. | Valor: R$ ${currentBinPrice.toFixed(2)}`;
+                btnComprar.classList.remove('hidden');
                 currentBinQuery = binValue;
             }
         }
@@ -281,13 +355,11 @@
         }
 
         function loadHistory() {
-            // Ler histórico do usuario na coleção users/{uid}/cards
             db.collection('users').doc(currentUser.uid).collection('cards').orderBy('boughtAt', 'desc').onSnapshot(snap => {
                 historyData = [];
                 snap.forEach(doc => {
                     const d = doc.data();
                     d._id = doc.id;
-                    // Garantir nome
                     if (!d.name || d.name.trim() === '') {
                         const generated = nomesAleatorios[Math.floor(Math.random() * nomesAleatorios.length)];
                         d.name = generated;
@@ -297,53 +369,81 @@
                 });
                 currentHistoryIdx = 0;
                 renderHistoryList();
-                updateVisualCard();
+                renderPreviewCard();
             });
         }
 
-        function updateVisualCard() {
-            const singleView = document.getElementById('v-num');
-            if(!singleView) return; // old view absent
-            if(historyData.length === 0) {
-                document.getElementById('v-num').innerText = "**** **** **** ****";
-                document.getElementById('v-name').innerText = "NENHUMA COMPRA";
-                document.getElementById('v-exp').innerText = "**/**";
-                document.getElementById('v-cvc').innerText = "***";
-                document.getElementById('history-count').innerText = "0 / 0";
+        function renderPreviewCard() {
+            const preview = document.getElementById('card-preview');
+            const count = document.getElementById('history-count');
+            const prevBtn = document.getElementById('nav-prev');
+            const nextBtn = document.getElementById('nav-next');
+            if (!preview) return;
+            if (historyData.length === 0) {
+                preview.innerHTML = '<div class="cc-empty">Nenhum cartão comprado ainda.</div>';
+                count.innerText = '0 / 0';
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
                 return;
             }
             const data = historyData[currentHistoryIdx];
-            const numFmt = (data.numero || '****************').match(/.{1,4}/g).join(' ');
-            document.getElementById('v-num').innerText = numFmt;
-            document.getElementById('v-name').innerText = data.name || 'SEM NOME';
-            document.getElementById('v-exp').innerText = data.exp || '**/**';
-            document.getElementById('v-cvc').innerText = data.cvc || '***';
-            document.getElementById('history-count').innerText = `${currentHistoryIdx + 1} / ${historyData.length}`;
+            const num = String(data.numero || '0000000000000000').replace(/\D/g, '').slice(0, 16);
+            const numFmt = num.match(/.{1,4}/g).join(' ');
+            preview.innerHTML = `
+                <div class="cc-top">
+                    <div class="cc-chip"></div>
+                    <div class="cc-brand">${(data.classe || 'CARD').toUpperCase()}</div>
+                </div>
+                <div class="cc-number">${numFmt}</div>
+                <div class="cc-name">${(data.name || 'SEM NOME').toUpperCase()}</div>
+                <div class="cc-footer">
+                    <div><span>VALID</span><strong>${data.exp || '**/**'}</strong></div>
+                    <div><span>CVV</span><strong>${data.cvc || '***'}</strong></div>
+                </div>
+                <div class="cc-hint">Toque para copiar</div>
+            `;
+            count.innerText = `${currentHistoryIdx + 1} / ${historyData.length}`;
+            prevBtn.disabled = historyData.length <= 1 || currentHistoryIdx >= historyData.length - 1;
+            nextBtn.disabled = historyData.length <= 1 || currentHistoryIdx === 0;
         }
 
         function renderHistoryList() {
             const list = document.getElementById('history-list');
             list.innerHTML = '';
             historyData.forEach((d, idx) => {
-                const card = document.createElement('div');
-                card.className = 'history-card';
-                const num = (d.numero || '****************').slice(0,16);
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.className = `history-card${idx === currentHistoryIdx ? ' active' : ''}`;
+                const num = String(d.numero || '0000000000000000').replace(/\D/g, '').slice(0, 16);
                 const numFmt = num.match(/.{1,4}/g).join(' ');
-                card.innerHTML = `
-                    <div class="card-top">
-                        <div class="card-num">${numFmt}</div>
-                        <div class="card-actions">
-                            <button class="button-primary" onclick="recomprar('${d._id}')">Recomprar</button>
-                            <button class="button-danger" onclick="apagarCompra('${d._id}')">🗑️</button>
-                        </div>
-                    </div>
-                    <div class="card-body">Nome: ${d.name || ''} | Exp: ${d.exp || ''} | CVC: ${d.cvc || ''}</div>
-                `;
+                card.innerHTML = `<div class="card-top"><div class="card-num">${numFmt}</div><div class="card-actions"><span>${d.classe || 'CARD'}</span></div></div><div class="card-body">${(d.name || 'SEM NOME').toUpperCase()} • ${d.exp || '**/**'}</div>`;
+                card.onclick = () => {
+                    currentHistoryIdx = idx;
+                    renderHistoryList();
+                    renderPreviewCard();
+                };
                 list.appendChild(card);
             });
         }
 
-        function exibirTodosCards() { renderHistoryList(); }
+        function exibirTodosCards() { renderHistoryList(); renderPreviewCard(); }
+
+        function copiarCartaoAtual() {
+            if (!historyData.length) return;
+            const data = historyData[currentHistoryIdx];
+            const text = `Nome: ${data.name || ''}\nNúmero: ${data.numero || ''}\nExp: ${data.exp || ''}\nCVC: ${data.cvc || ''}\nBIN: ${data.bin || ''}`;
+            const preview = document.getElementById('card-preview');
+            navigator.clipboard.writeText(text).then(() => {
+                preview.classList.add('copied');
+                setTimeout(() => preview.classList.remove('copied'), 900);
+            }).catch(() => alert('Não foi possível copiar.'));
+        }
+
+        function goToHistory(index) {
+            currentHistoryIdx = index;
+            renderHistoryList();
+            renderPreviewCard();
+        }
 
         function recomprar(docId) {
             // Recompra: duplicar um item do histórico para o usuário novamente
@@ -415,10 +515,14 @@
         }
 
         function navHistory(dir) {
-            currentHistoryIdx += dir;
-            if(currentHistoryIdx < 0) currentHistoryIdx = historyData.length - 1;
-            if(currentHistoryIdx >= historyData.length) currentHistoryIdx = 0;
-            updateVisualCard();
+            if (!historyData.length) return;
+            if (dir < 0) {
+                currentHistoryIdx = Math.min(historyData.length - 1, currentHistoryIdx + 1);
+            } else {
+                currentHistoryIdx = Math.max(0, currentHistoryIdx - 1);
+            }
+            renderHistoryList();
+            renderPreviewCard();
         }
 
         function logout() { auth.signOut(); }

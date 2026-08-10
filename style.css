@@ -207,33 +207,47 @@ select:focus { border-color: var(--primary-neon); }
 }
 
 /* Responsive Android Visual CC */
-.cc-viewer { 
-    position: relative; 
-    width: 100%; /* Adapts to Android screen */
-    max-width: 360px; 
-    aspect-ratio: 1.6; /* Keeps perfect card shape */
-    background: repeating-linear-gradient(45deg, #070707, #070707 10px, #0e0e0e 10px, #0e0e0e 20px); 
-    border: 1px solid var(--text-main); 
-    margin: 20px auto; 
-    overflow: hidden; 
-    box-shadow: 0 0 15px rgba(0,0,0,0.9); 
+.cc-preview-card {
+    position: relative;
+    width: 100%;
+    max-width: 360px;
+    aspect-ratio: 1.6;
+    background: linear-gradient(135deg, #111, #2b2b2b 50%, #111 100%);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    margin: 20px auto;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 0 22px rgba(0,0,0,0.8);
+    cursor: pointer;
 }
-.cc-viewer::before { 
-    content: ''; 
-    position: absolute; top: 15px; left: 15px; 
-    width: 40px; height: 30px; 
-    background: repeating-linear-gradient(90deg, #665522, #665522 2px, #887733 2px, #887733 4px); 
-    border-radius: 4px; 
+.cc-preview-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 20px;
+    background: linear-gradient(120deg, rgba(255,255,255,0.05), transparent 45%, rgba(255,255,255,0.04));
+    pointer-events: none;
 }
-/* Percentages for positioning inside responsive container */
-.cc-number { 
-    position: absolute; top: 45%; left: 5%; 
-    font-size: clamp(16px, 5.5vw, 22px); /* Scales font with screen */
-    letter-spacing: 2px; text-shadow: 2px 2px 0px #000; color: #fff; 
-}
-.cc-name { position: absolute; bottom: 10%; left: 5%; font-size: clamp(10px, 4vw, 14px); color: var(--text-main); }
-.cc-exp { position: absolute; bottom: 10%; right: 22%; font-size: clamp(10px, 3.5vw, 12px); color: var(--text-main); }
-.cc-cvc { position: absolute; bottom: 10%; right: 5%; font-size: clamp(10px, 3.5vw, 14px); color: var(--secondary-neon); }
+.cc-preview-card.copied { box-shadow: 0 0 0 2px rgba(0,255,85,0.5); }
+.cc-top { display:flex; justify-content:space-between; align-items:center; }
+.cc-chip { width: 48px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, #f5d66f, #c89607); }
+.cc-brand { font-size: 12px; color: #fff; letter-spacing: 1px; }
+.cc-number { font-size: clamp(16px, 5.5vw, 24px); letter-spacing: 2px; color: #fff; margin-top: 16px; }
+.cc-name { font-size: clamp(10px, 3.8vw, 14px); color: #dce9dc; margin-top: 10px; }
+.cc-footer { display:flex; justify-content:space-between; gap: 12px; margin-top: 12px; color: #dce9dc; font-size: 10px; }
+.cc-footer span { display:block; color: rgba(255,255,255,0.65); margin-bottom: 4px; }
+.cc-hint { font-size: 10px; color: rgba(255,255,255,0.7); text-align: right; margin-top: 8px; }
+.cc-empty { display:flex; align-items:center; justify-content:center; height:100%; color:#ccffcc; font-size:12px; }
+.history-list { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.history-card { width:100%; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); border-radius: 12px; padding: 10px; text-align:left; color: inherit; }
+.history-card.active { border-color: var(--secondary-neon); box-shadow: inset 0 0 0 1px rgba(255,42,42,0.25); }
+.card-top { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.card-num { font-size: 12px; color:#fff; letter-spacing:1px; }
+.card-actions span { font-size: 10px; color: var(--text-main); }
+.card-body { font-size: 10px; color: var(--text-main); margin-top:6px; }
+.nav-arrows button:disabled { opacity: 0.45; cursor:not-allowed; }
 
 .nav-arrows { display: flex; justify-content: space-between; width: 100%; max-width: 360px; margin: 0 auto; gap: 10px; }
 .nav-arrows button { width: 100%; margin: 0; padding: 12px; font-size: 12px; }
