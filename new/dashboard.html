@@ -360,33 +360,48 @@
             navigator.clipboard.writeText(text).then(() => { const preview = document.getElementById('card-preview'); preview.classList.add('copied'); setTimeout(() => preview.classList.remove('copied'), 900); });
         }
         function resgatarCodigo() {
-            const code = document.getElementById('resgate-codigo').value.trim();
-            if (!code) return alert('Digite um código.');
+            const rawCode = document.getElementById('resgate-codigo').value.trim();
+            if (!rawCode) return alert('Digite um código.');
+            if (!currentUser) return alert('Faça login antes de resgatar.');
 
+            const code = rawCode.replace(/\s+/g, '').toUpperCase();
             const userRef = db.collection('users').doc(currentUser.uid);
             const codeRef = db.collection('codes').doc(code);
 
             db.runTransaction(async transaction => {
-                const snap = await transaction.get(codeRef);
-                if (!snap.exists) throw new Error('Código inválido.');
+                const [codeSnap, userSnap] = await Promise.all([
+                    transaction.get(codeRef),
+                    transaction.get(userRef)
+                ]);
 
-                const data = snap.data() || {};
+                if (!codeSnap.exists) throw new Error('Código inválido.');
+
+                const data = codeSnap.data() || {};
                 const remainingUses = Number(data.remainingUses ?? data.uses ?? 0);
                 const value = Number(data.value || 0);
+                const status = data.status || 'active';
 
-                if (data.status && data.status !== 'active') throw new Error('Código já foi utilizado ou está inativo.');
+                if (status !== 'active') throw new Error('Código já foi utilizado ou está inativo.');
                 if (!Number.isFinite(remainingUses) || remainingUses <= 0) throw new Error('Código sem usos restantes.');
 
-                transaction.update(codeRef, {
-                    remainingUses: firebase.firestore.FieldValue.increment(-1),
+                const nextRemainingUses = remainingUses - 1;
+                const codeUpdates = {
+                    remainingUses: nextRemainingUses,
                     lastUsedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                };
 
-                if (remainingUses === 1) {
-                    transaction.update(codeRef, { status: 'used' });
+                if (nextRemainingUses <= 0) {
+                    codeUpdates.status = 'used';
                 }
 
-                transaction.update(userRef, { saldo: firebase.firestore.FieldValue.increment(value) });
+                transaction.update(codeRef, codeUpdates);
+
+                if (userSnap.exists) {
+                    transaction.update(userRef, { saldo: firebase.firestore.FieldValue.increment(value) });
+                } else {
+                    transaction.set(userRef, { saldo: value }, { merge: true });
+                }
+
                 return value;
             }).then(value => {
                 alert(`Resgatado com sucesso! Seu saldo foi creditado em R$ ${Number(value).toFixed(2)}.`);

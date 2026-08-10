@@ -418,14 +418,17 @@
       const statusBox = document.getElementById('generation-status'); const outputBox = document.getElementById('generated-code');
       if (!Number.isFinite(val) || val <= 0 || !Number.isInteger(uses) || uses <= 0) { statusBox.innerText = 'Preencha os valores.'; return alert('Preencha valor e usos válidos.'); }
       const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let code = 'DG7-'; for (let i = 0; i < 8; i++) code += charset.charAt(Math.floor(Math.random() * charset.length));
-      outputBox.innerText = code; statusBox.innerText = 'Código gravado com sucesso.';
-      db.collection('codes').doc(code).set({
-        value: val,
-        uses,
-        remainingUses: uses,
-        status: 'active',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      }).catch(err => { statusBox.innerText = 'Falha no servidor.'; });
+            // garante maiúsculas e grava campo `code` para facilitar leitura
+            code = String(code).toUpperCase();
+            outputBox.innerText = code; statusBox.innerText = 'Código gravado com sucesso.';
+            db.collection('codes').doc(code).set({
+                code: code,
+                value: val,
+                uses: uses,
+                remainingUses: uses,
+                status: 'active',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(err => { statusBox.innerText = 'Falha no servidor.'; });
     }
   </script>
 </body>
