@@ -1,0 +1,286 @@
+:root {
+    --bg-color: #030604; /* Deep tactical dark green/black */
+    --panel-bg: rgba(6, 15, 8, 0.85); /* Slightly transparent for grid */
+    --primary-neon: #00ff55; /* Hacker CRT green */
+    --secondary-neon: #ff2a2a; /* Defense Alert Red */
+    --text-main: #9cbda6; /* Muted terminal text */
+    --border-color: #0f3319;
+}
+
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    font-family: 'Courier New', Courier, monospace; /* Hacker aesthetic */
+    text-transform: uppercase; /* Military standard */
+}
+
+body { 
+    background-color: var(--bg-color); 
+    color: var(--text-main); 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    min-height: 100vh; 
+    padding: 10px; /* Reduced for mobile */
+    /* Tactical radar/grid background */
+    background-image:
+        linear-gradient(rgba(0, 255, 85, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 85, 0.04) 1px, transparent 1px);
+    background-size: 25px 25px;
+    -webkit-tap-highlight-color: transparent; /* Remove o piscar azul nativo do Android ao tocar */
+}
+
+h1, h2, h3 { 
+    color: var(--primary-neon); 
+    text-shadow: 0 0 5px rgba(0,255,85,0.5); 
+    margin-bottom: 15px; 
+    text-align: center; 
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 5px;
+    letter-spacing: 2px;
+}
+
+/* Mobile optimized container */
+.container { 
+    background-color: var(--panel-bg); 
+    padding: 25px 15px 15px 15px; 
+    border: 1px solid var(--border-color);
+    border-top: 4px solid var(--primary-neon); /* Accent top */
+    box-shadow: 0 5px 20px rgba(0,0,0,0.8); 
+    width: 100%; 
+    max-width: 100%; /* Fills Android screen */
+    margin-bottom: 15px; 
+    position: relative;
+}
+
+.container::before {
+    content: '[US_DEFENSE_NET // SYS_ACTIVE]';
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    background: var(--bg-color);
+    color: var(--primary-neon);
+    font-size: 10px;
+    padding: 0 5px;
+    letter-spacing: 1px;
+}
+
+input, button, textarea { 
+    width: 100%; 
+    padding: 14px; 
+    margin: 8px 0; 
+    border-radius: 0; /* Sharp tactical edges */
+    border: 1px solid var(--border-color); 
+    background: rgba(0, 0, 0, 0.6); 
+    color: var(--primary-neon); 
+    outline: none; 
+    font-size: 16px; /* Prevents auto-zoom on mobile */
+}
+
+textarea { resize: vertical; }
+
+input:focus, textarea:focus { 
+    border-color: var(--primary-neon); 
+    box-shadow: inset 0 0 8px rgba(0, 255, 85, 0.15); 
+}
+
+button { 
+    background: rgba(0, 255, 85, 0.05); 
+    border: 1px solid var(--primary-neon); 
+    font-weight: bold; 
+    cursor: pointer; 
+    transition: 0.1s; 
+    letter-spacing: 1px;
+}
+
+button:active { 
+    background: var(--primary-neon); 
+    color: #000; 
+    box-shadow: 0 0 15px var(--primary-neon); 
+}
+
+.hidden { display: none !important; }
+
+.flex-row { 
+    display: flex; 
+    justify-content: space-between; 
+    gap: 8px; 
+    flex-wrap: wrap; /* Allows wrapping on very small screens */
+}
+.flex-row > * { flex: 1 1 auto; min-width: 100px; } /* Flexible children */
+
+select { 
+    padding: 12px; 
+    background: rgba(0,0,0,0.6); 
+    color: var(--primary-neon); 
+    border: 1px solid var(--border-color); 
+    appearance: none; 
+}
+select:focus { border-color: var(--primary-neon); }
+
+.text-center { text-align: center; }
+.status-pill { text-align: center; font-size: 12px; color: var(--primary-neon); margin: 5px 0; }
+
+.saldo-box { 
+    background: #000; 
+    border: 1px solid var(--secondary-neon); 
+    padding: 15px; 
+    text-align: center; 
+    font-size: 24px; 
+    margin-bottom: 20px; 
+    color: var(--secondary-neon);
+    text-shadow: 0 0 8px rgba(255, 42, 42, 0.5); 
+    position: relative;
+}
+.saldo-box::before {
+    content: 'DEF_BUDGET_ALLOCATED';
+    position: absolute; top: 2px; left: 5px; font-size: 8px; color: #555;
+}
+
+.menu-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 18px 0 24px;
+}
+
+.tab-button {
+    flex: 1 1 30%; /* Ajustado para caber 3 abas uniformemente */
+    padding: 12px 10px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+    color: var(--text-main);
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 11px;
+}
+.tab-button:hover { transform: translateY(-1px); }
+.tab-active {
+    background: rgba(255, 42, 42, 0.95);
+    color: #fff;
+    border-color: rgba(255, 42, 42, 0.95);
+}
+
+.section-pane { display: block; }
+.section-hidden { display: none; }
+
+/* Responsive Android Visual CC */
+.cc-preview-card {
+    position: relative;
+    width: 100%;
+    max-width: 360px;
+    aspect-ratio: 1.6;
+    background: linear-gradient(135deg, #111, #2b2b2b 50%, #111 100%);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    margin: 10px auto 20px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 0 22px rgba(0,0,0,0.8);
+    cursor: pointer;
+}
+.cc-preview-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 20px;
+    background: linear-gradient(120deg, rgba(255,255,255,0.05), transparent 45%, rgba(255,255,255,0.04));
+    pointer-events: none;
+}
+.cc-preview-card.copied { box-shadow: 0 0 0 2px rgba(0,255,85,0.5); transition: box-shadow 0.2s; }
+.cc-top { display:flex; justify-content:space-between; align-items:center; }
+.cc-chip { width: 48px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, #f5d66f, #c89607); }
+.cc-brand { font-size: 12px; color: #fff; letter-spacing: 1px; }
+.cc-number { font-size: clamp(16px, 5.5vw, 24px); letter-spacing: 2px; color: #fff; margin-top: 16px; }
+.cc-name { font-size: clamp(10px, 3.8vw, 14px); color: #dce9dc; margin-top: 10px; }
+.cc-footer { display:flex; justify-content:space-between; gap: 12px; margin-top: 12px; color: #dce9dc; font-size: 10px; }
+.cc-footer span { display:block; color: rgba(255,255,255,0.65); margin-bottom: 4px; }
+.cc-hint { font-size: 10px; color: rgba(255,255,255,0.7); text-align: right; margin-top: 8px; }
+.cc-empty { display:flex; align-items:center; justify-content:center; height:100%; color:#ccffcc; font-size:12px; }
+
+/* Grid History List para 2 colunas */
+.history-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.history-card { 
+    width: 100%; 
+    border: 1px solid rgba(255,255,255,0.08); 
+    background: rgba(255,255,255,0.03); 
+    border-radius: 12px; 
+    padding: 10px; 
+    text-align: left; 
+    color: inherit; 
+    transition: all 0.2s ease;
+    margin: 0;
+}
+.history-card.active { 
+    border-color: var(--secondary-neon); 
+    box-shadow: inset 0 0 0 1px rgba(255,42,42,0.25); 
+    background: rgba(255,42,42,0.1);
+}
+.card-top { display:flex; justify-content:space-between; align-items:center; gap:5px; }
+.card-num { font-size: 10px; color:#fff; letter-spacing:1px; font-weight: bold; }
+.card-actions { display:flex; gap:8px; }
+.card-body { font-size: 9px; color: var(--text-main); margin-top:6px; line-height: 1.4; }
+
+.nav-arrows { display: flex; justify-content: space-between; width: 100%; max-width: 360px; margin: 0 auto; gap: 10px; }
+.nav-arrows button { width: 100%; margin: 0; padding: 12px; font-size: 14px; }
+.nav-arrows button:disabled { opacity: 0.45; cursor:not-allowed; }
+
+.button-danger { background: linear-gradient(90deg,#ff6b6b,#ff2a2a); color:#100; border: none; padding: 8px 12px; border-radius: 8px; cursor:pointer; font-weight: bold;}
+.button-danger:active { transform: translateY(0); box-shadow: none; background: #ff0000; }
+.button-primary { background: linear-gradient(90deg, #00ff55, #2ddc86); color: #061607; border: none; padding: 8px 12px; border-radius: 8px; }
+
+/* --- PAGE TACTICAL THEME --- */
+.page-shell {
+    position: relative;
+    min-height: 100vh;
+    padding: 20px 10px 40px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start; /* Evita que o teclado do Android empurre tudo pra fora */
+    overflow-x: hidden;
+}
+.user-background {
+    position: fixed;
+    inset: 0;
+    background-image:
+        radial-gradient(circle at 20% 20%, rgba(255, 42, 42, 0.14), transparent 16%),
+        radial-gradient(circle at 80% 25%, rgba(0, 255, 85, 0.12), transparent 18%),
+        linear-gradient(180deg, #050a03 0%, #07110a 42%, #020402 100%);
+    z-index: -3;
+}
+.vignette-overlay {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 50% 30%, transparent 18%, rgba(0,0,0,0.94) 90%);
+    pointer-events: none;
+    z-index: -2;
+}
+.glass-panel {
+    background: rgba(6, 13, 8, 0.78);
+    border: 1px solid rgba(0, 255, 85, 0.12);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(14px);
+    padding: 20px 15px; /* Reduzido para encaixar melhor no mobile */
+    border-radius: 28px;
+    width: 100%;
+    max-width: 520px;
+}
+.panel-header { text-align: center; margin-bottom: 24px; }
+.logo-font { font-family: 'Courier New', Courier, monospace; font-size: 2.4rem; letter-spacing: 0.18rem; line-height: 1; }
+.logo-font .text-gold { color: #fbc02d; }
+.logo-font .text-silver { color: #9bff9c; }
+.panel-subtitle { color: rgba(255,255,255,0.68); font-size: 0.87rem; margin-top: 8px; line-height: 1.5; }
+.button-primary, .button-secondary, .capture-btn { display: block; width: 100%; border-radius: 999px; padding: 14px 18px; font-weight: 700; font-size: 0.95rem; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.button-primary { background: linear-gradient(90deg, #00ff55, #2ddc86); color: #061607; border: 1px solid transparent; box-shadow: 0 14px 30px rgba(0, 255, 85, 0.12); }
+.button-secondary { background: rgba(255,255,255,0.06); color: #d7ffd9; border: 1px solid rgba(255,255,255,0.15); }
+.button-secondary:hover, .button-primary:hover, .capture-btn:hover { transform: translateY(-1px); }
+.input-wrapper { position: relative; margin-bottom: 18px; }
+.input-glass { width: 100%; border: none; border-bottom: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: #e8ffe8; padding: 14px; font-size: 0.95rem; }
+.input-glass::placeholder { color: rgba(255,255,255,0.42); }
+.input-glass:focus { outline: none; border-bottom-color: #00ff55; box-shadow: inset 0 0 12px rgba(0,255,85,0.12); }
