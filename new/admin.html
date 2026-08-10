@@ -12,41 +12,42 @@
   <div class="user-background"></div>
   <div class="vignette-overlay"></div>
   <div class="page-shell">
-      <div class="glass-panel">
-          <div class="panel-header">
+      <div class="glass-panel" style="padding: 15px;">
+          <div class="panel-header" style="margin-bottom: 15px;">
               <div class="logo-font"><span class="text-silver">DG</span><span class="text-gold">7</span><span class="text-silver">STORE</span></div>
-              <p class="panel-subtitle">Administração com visual uniforme e controle de segurança.</p>
+              <p class="panel-subtitle" style="font-size: 10px;">Administração Central</p>
           </div>
           <div class="status-pill" id="db-status">CONECTANDO...</div>
       </div>
 
-      <div class="glass-panel" id="auth-check">
+      <div class="glass-panel" id="auth-check" style="padding: 20px 15px; margin-top: 15px;">
           <h2 id="auth-title">Carregando...</h2>
-          <p id="auth-desc" class="text-center" style="font-size: 12px;">Verificando status de segurança no banco de dados.</p>
-          <input type="password" id="admin-pass" placeholder="Senha" style="display: none;">
-          <button id="auth-btn" class="button-primary" onclick="handleAuth()" style="display: none;">Acessar</button>
+          <input type="password" id="admin-pass" placeholder="Senha" style="display: none; font-size: 14px;">
+          <button id="auth-btn" class="button-primary" onclick="handleAuth()" style="display: none; padding: 12px;">Acessar</button>
       </div>
 
-      <div class="glass-panel hidden" id="admin-panel">
-          <h3 style="color:var(--secondary-neon)">Parser e Conversor (Valores)</h3>
-          <p style="font-size: 10px; margin-bottom: 10px;">Cole o texto bruto aqui. O extrator acha os cartões e pede o preço por BIN.</p>
-          <textarea id="raw-text" rows="5" placeholder="Cole qualquer lixo/texto aqui..."></textarea>
-          <button class="button-primary" onclick="parseText()">Analisar e Extrair</button>
+      <div class="glass-panel hidden" id="admin-panel" style="padding: 20px 15px; margin-top: 15px;">
+          <h3 style="color:var(--secondary-neon); font-size: 16px;">Extrator Master</h3>
+          <p style="font-size: 10px; margin-bottom: 10px;">O extrator ignora caracteres estranhos, espaços ou barras (|) e separa os blocos de forma inteligente.</p>
           
-          <div id="parsed-results" style="margin-top:10px; font-size:10px; background:#000; padding:10px; border:1px solid #111;"></div>
+          <textarea id="raw-text" rows="6" placeholder="Cole qualquer lixo/texto aqui..." style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 10px; margin-bottom: 10px;"></textarea>
           
-          <button class="button-secondary" onclick="uploadToDB()" style="margin-top: 15px;">Subir para Central DB</button>
+          <button class="button-primary" onclick="parseText()" style="padding: 12px;">Analisar e Extrair</button>
           
-          <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 20px 0;">
+          <div id="parsed-results" style="margin-top:15px; font-size:12px; background:rgba(0,0,0,0.8); padding:15px; border:1px solid #111; border-radius: 8px;"></div>
+          
+          <button class="button-secondary" onclick="uploadToDB()" style="margin-top: 15px; padding: 12px;">Subir para o Banco Central</button>
+          
+          <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 25px 0;">
 
-          <h3>Gerador de Códigos</h3>
-          <div class="flex-row">
-            <input type="number" id="code-value" placeholder="Valor (R$)">
-            <input type="number" id="code-uses" placeholder="Qtd. usos">
+          <h3 style="font-size: 16px;">Gerador de Códigos</h3>
+          <div class="flex-row" style="gap: 10px; margin-bottom: 10px;">
+            <input type="number" id="code-value" placeholder="Valor (R$)" style="flex: 1; padding: 12px;">
+            <input type="number" id="code-uses" placeholder="Qtd. Usos" style="flex: 1; padding: 12px;">
           </div>
-          <button class="button-primary" onclick="generateCode()">Gerar Código</button>
-          <div id="generation-status" class="status-pill">Pronto para gerar.</div>
-          <div id="generated-code" style="text-align:center; font-size: 20px; color: var(--primary-neon); margin-top: 10px;">DG7-XXXX-XXXX</div>
+          <button class="button-primary" onclick="generateCode()" style="padding: 12px;">Gerar Código</button>
+          <div id="generation-status" class="status-pill" style="margin-top: 10px;">Pronto para gerar.</div>
+          <div id="generated-code" style="text-align:center; font-size: 22px; color: var(--primary-neon); margin-top: 15px; font-weight: bold;">DG7-XXXX-XXXX</div>
       </div>
   </div>
 
@@ -64,14 +65,14 @@
         try {
             const doc = await db.collection('admin_config').doc('security').get();
             document.getElementById('admin-pass').style.display = 'block'; document.getElementById('auth-btn').style.display = 'block'; document.getElementById('db-status').innerText = 'ONLINE';
-            if (doc.exists && doc.data().masterHash) { isSetupMode = false; document.getElementById('auth-title').innerText = "Senha Admin"; document.getElementById('auth-desc').innerText = "Digite a senha mestre."; document.getElementById('auth-btn').innerText = "Acessar Painel"; } 
-            else { isSetupMode = true; document.getElementById('auth-title').innerText = "Criar Senha"; document.getElementById('auth-desc').innerText = "Crie a senha mestre do painel."; document.getElementById('auth-btn').innerText = "Criar e Acessar"; }
+            if (doc.exists && doc.data().masterHash) { isSetupMode = false; document.getElementById('auth-title').innerText = "Senha Admin"; document.getElementById('auth-btn').innerText = "Acessar"; } 
+            else { isSetupMode = true; document.getElementById('auth-title').innerText = "Criar Senha"; document.getElementById('auth-btn').innerText = "Criar"; }
         } catch (e) { document.getElementById('db-status').innerText = 'ERRO DE CONEXÃO'; }
     };
 
     async function handleAuth() {
         const pass = document.getElementById('admin-pass').value; if (!pass) return alert('Digite a senha.'); const hash = await sha256(pass);
-        if (isSetupMode) { await db.collection('admin_config').doc('security').set({ masterHash: hash }); alert('Senha criada! Acesso liberado.'); liberarPainel(); isSetupMode = false; document.getElementById('auth-title').innerText = "Senha Admin"; document.getElementById('auth-desc').innerText = "Digite a senha mestre."; document.getElementById('auth-btn').innerText = "Acessar Painel"; document.getElementById('admin-pass').value = ''; } 
+        if (isSetupMode) { await db.collection('admin_config').doc('security').set({ masterHash: hash }); alert('Senha criada!'); liberarPainel(); isSetupMode = false; document.getElementById('auth-title').innerText = "Senha Admin"; document.getElementById('admin-pass').value = ''; } 
         else { const doc = await db.collection('admin_config').doc('security').get(); if (doc.data().masterHash === hash) { liberarPainel(); } else { alert('Senha Incorreta!'); } }
     }
 
@@ -92,26 +93,31 @@
     async function parseText() {
       const text = document.getElementById('raw-text').value; const lines = text.split(/\r?\n/).filter(Boolean);
       parsedItems = []; uniqueBins.clear();
-      let outputHTML = '<h4 style="color:var(--text-main)">Extratos:</h4><div style="margin-bottom:15px; font-size:10px;">';
+      let outputHTML = '<h4 style="color:var(--text-main); margin-bottom: 8px;">Itens Extraídos:</h4><div style="margin-bottom:15px; font-size:11px; line-height: 1.4;">';
 
       for (const line of lines) {
-        const match = line.match(/(\d{13,19})[\s\-/]*(\d{2})[\/\s-]*(\d{2,4})[\s\-/]*(\d{3,4})/);
+        const match = line.match(/(\d{13,19})[\D]+(\d{2})[\D]+(\d{2,4})[\D]+(\d{3,4})/);
         if (!match) continue;
-        const num = match[1].replace(/\D/g, ''); const mes = match[2]; const anoStr = match[3]; const ano = anoStr.length === 2 ? '20' + anoStr : anoStr; const cvc = match[4]; const bin = num.substring(0, 6);
+        const num = match[1]; const mes = match[2]; const anoStr = match[3]; const ano = anoStr.length === 2 ? '20' + anoStr : anoStr; const cvc = match[4]; const bin = num.substring(0, 6);
         uniqueBins.add(bin);
         parsedItems.push({ numero: num, exp: `${mes}/${ano}`, cvc, bin, bin_prefix: bin, status: 'available', owner: null, classe: 'OUTRA', bandeira: 'INTERNACIONAL' });
-        outputHTML += `${num}|${mes}|${ano}|${cvc}<br>`;
+        outputHTML += `<strong>${num}</strong> | ${mes} | ${ano} | ${cvc}<br>`;
       }
 
-      if (parsedItems.length > 1000) outputHTML += `<div style="margin-top:8px; color:#ff9b9b">Processando até ${parsedItems.length} itens; o upload será feito em lotes.</div>`;
+      if (parsedItems.length > 1000) outputHTML += `<div style="margin-top:8px; color:#ff9b9b">Processando até ${parsedItems.length} itens.</div>`;
       outputHTML += '</div>';
 
       if (parsedItems.length > 0) {
-          outputHTML += '<h4 style="color: var(--secondary-neon); margin-bottom: 10px;">Defina os Preços:</h4>';
-          [...uniqueBins].forEach(bin => { outputHTML += `<div style="margin-bottom: 8px;"> BIN <strong>${bin}</strong>: <input type="number" id="price-${bin}" placeholder="R$ (Ex: 35.00)" style="width: 100%; padding: 10px; margin-top: 5px;"> </div>`; });
+          outputHTML += '<h4 style="color: var(--secondary-neon); margin-bottom: 10px; font-size: 14px;">Defina os Preços:</h4>';
+          [...uniqueBins].forEach(bin => { 
+              outputHTML += `<div style="margin-bottom: 12px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;"> 
+              BIN <strong>${bin}</strong>: 
+              <input type="number" id="price-${bin}" placeholder="R$ (Ex: 35.00)" style="width: 100%; padding: 12px; margin-top: 8px; font-size: 14px; box-sizing: border-box;"> 
+              </div>`; 
+          });
       }
 
-      document.getElementById('parsed-results').innerHTML = outputHTML || 'Nenhum padrão encontrado.';
+      document.getElementById('parsed-results').innerHTML = outputHTML || 'Nenhum padrão encontrado. Verifique o texto.';
 
       if (parsedItems.length > 0) {
         const binList = [...uniqueBins]; const metaMap = {};
@@ -140,20 +146,18 @@
         await batch.commit(); written += slice.length;
       }
 
-      alert(`${written} itens adicionados!`);
+      alert(`${written} itens adicionados com sucesso!`);
       parsedItems = []; uniqueBins.clear(); document.getElementById('parsed-results').innerHTML = '';
-      
-      // LIMPANDO O TEXTO BRUTO PARA NÃO DUPLICAR ENVIOS ACIDENTAIS
       document.getElementById('raw-text').value = '';
     }
 
     function generateCode() {
       const val = parseFloat(document.getElementById('code-value').value); const uses = parseInt(document.getElementById('code-uses').value, 10);
       const statusBox = document.getElementById('generation-status'); const outputBox = document.getElementById('generated-code');
-      if (!Number.isFinite(val) || val <= 0 || !Number.isInteger(uses) || uses <= 0) { statusBox.innerText = 'Erro: Valor/Qtd inválidos.'; return alert('Preencha valor e usos válidos.'); }
+      if (!Number.isFinite(val) || val <= 0 || !Number.isInteger(uses) || uses <= 0) { statusBox.innerText = 'Preencha os valores.'; return alert('Preencha valor e usos válidos.'); }
       const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let code = 'DG7-'; for (let i = 0; i < 8; i++) code += charset.charAt(Math.floor(Math.random() * charset.length));
-      outputBox.innerText = code; statusBox.innerText = 'Salvando no banco...';
-      db.collection('codes').doc(code).set({ value: val, uses, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).then(() => { statusBox.innerText = 'Registrado com sucesso.'; }).catch(err => { statusBox.innerText = 'Falha na sincronização.'; });
+      outputBox.innerText = code; statusBox.innerText = 'Código gravado com sucesso.';
+      db.collection('codes').doc(code).set({ value: val, uses, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(err => { statusBox.innerText = 'Falha no servidor.'; });
     }
   </script>
 </body>
