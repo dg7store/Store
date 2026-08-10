@@ -28,59 +28,42 @@
 
       <div class="glass-panel hidden" id="admin-panel" style="padding: 20px 15px; margin-top: 15px;">
           
-          <h3 style="color:var(--secondary-neon); font-size: 16px;">Extrator Master Juspay</h3>
-          <p style="font-size: 10px; margin-bottom: 10px;">Consulta Juspay API para salvar: Bandeira, Classe, Tipo, Banco e País. Gera CEP e Nome auto.</p>
-          
-          <textarea id="raw-text" rows="6" placeholder="Cole qualquer lixo/texto aqui..." style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 10px; margin-bottom: 10px;"></textarea>
-          
-          <button class="button-primary" onclick="parseText()" style="padding: 12px;">Analisar e Extrair</button>
-          
+          <h3 style="color:var(--secondary-neon); font-size: 16px;">Extrator Master</h3>
+          <p style="font-size: 10px; margin-bottom: 10px;">Consulta Juspay API para salvar dados do cartão gerando CEP e Nome auto.</p>
+          <textarea id="raw-text" rows="4" placeholder="Cole listas aqui..." style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 10px; margin-bottom: 10px;"></textarea>
+          <button class="button-primary" onclick="parseText()" style="padding: 12px;">Extrair</button>
           <div id="parsed-results" style="margin-top:15px; font-size:12px; background:rgba(0,0,0,0.8); padding:15px; border:1px solid #111; border-radius: 8px;"></div>
-          
-          <button class="button-secondary" onclick="uploadToDB()" style="margin-top: 15px; padding: 12px; border-color: var(--primary-neon); color: var(--primary-neon);">Subir para o Banco Central</button>
+          <button class="button-secondary" onclick="uploadToDB()" style="margin-top: 15px; padding: 12px; border-color: var(--primary-neon); color: var(--primary-neon);">Subir para DB</button>
           
           <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 25px 0;">
 
-          <!-- CONSTRUTOR PRO DE BOTÕES (ANTI-FRAUDE) -->
-          <h3 style="font-size: 16px; color: #00ff55;">Construtor de Botões Pro</h3>
-          <p style="font-size: 10px; margin-bottom: 10px;">A regra fica salva na DB (Anti-Fraude). Quando o usuário clicar, o sistema consulta diretamente aqui para cobrar o valor real e entregar a exata quantidade pedida.</p>
+          <!-- NOVO CONSTRUTOR PRO DE BOTÕES (VISUAL) -->
+          <h3 style="font-size: 16px; color: #00ff55;">Construtor de Combos & Botões</h3>
+          <p style="font-size: 10px; margin-bottom: 10px;">Adicione regras dinâmicas que puxam opções reais do seu estoque (Anti-Fraude). O que você criar aqui vai direto para a loja.</p>
           
-          <div class="flex-row" style="margin-bottom: 8px;">
-            <input type="text" id="btn-titulo" placeholder="Título (Ex: 300x BIN 123456)">
-            <input type="number" id="btn-preco" placeholder="Preço Cobrado (R$)">
+          <div class="flex-row" style="margin-bottom: 15px;">
+            <input type="text" id="btn-titulo" placeholder="Título (Ex: 5 USA 20$)">
+            <input type="number" id="btn-preco" placeholder="Preço Cobrado do Usuário (R$)">
           </div>
           
-          <div class="flex-row" style="margin-bottom: 8px;">
-            <input type="number" id="btn-qtd" placeholder="Qtd. de Cartões (Ex: 300)">
-            <select id="btn-tipo-filtro">
-                <option value="BIN">Por BIN Específica</option>
-                <option value="PAIS">Por País</option>
-                <option value="BANDEIRA">Por Bandeira</option>
-                <option value="CLASSE">Por Classe</option>
-                <option value="MIX">Mix Completo (Qualquer Cartão)</option>
-            </select>
-          </div>
-          <input type="text" id="btn-valor-filtro" placeholder="Valor (Ex: 123456, USA, PREPAID, VISA). Vazio se MIX." style="margin-bottom: 8px;">
+          <div id="regras-container"></div>
           
-          <button class="button-primary" onclick="criarBotaoSeguro()" style="padding: 12px; margin-top: 10px;">Salvar Botão Criptografado</button>
+          <button class="button-secondary" onclick="adicionarRegra()" style="padding: 10px; font-size: 12px; margin-bottom: 15px;">+ Adicionar Cartões ao Pacote</button>
+          <button class="button-primary" onclick="salvarBotao()" style="padding: 12px;">Gravar Botão na Loja</button>
           
           <div id="admin-botoes-list" style="margin-top: 15px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;"></div>
 
           <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 25px 0;">
-
           <h3 style="font-size: 16px; color: #fbc02d;">Varredura DB Universal</h3>
-          <p style="font-size: 10px; margin-bottom: 10px;">Vasculha TODOS os cartões na DB. Se faltar Banco, País, CEP ou Nome, ele consulta a API e arruma.</p>
-          <button class="button-secondary" onclick="sweepDatabase()" style="padding: 12px; margin-bottom: 10px;">Iniciar Varredura e Correção</button>
+          <button class="button-secondary" onclick="sweepDatabase()" style="padding: 12px;">Iniciar Varredura</button>
           
           <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 25px 0;">
-
           <h3 style="font-size: 16px;">Gerador de Códigos</h3>
           <div class="flex-row" style="gap: 10px; margin-bottom: 10px;">
             <input type="number" id="code-value" placeholder="Valor (R$)" style="flex: 1; padding: 12px;">
             <input type="number" id="code-uses" placeholder="Qtd. Usos" style="flex: 1; padding: 12px;">
           </div>
           <button class="button-primary" onclick="generateCode()" style="padding: 12px;">Gerar Código</button>
-          
           <div id="generation-status" class="status-pill" style="margin-top: 10px;">Pronto para gerar.</div>
       </div>
   </div>
@@ -91,6 +74,10 @@
     const db = firebase.firestore();
 
     let isSetupMode = false;
+    let storeCacheAdmin = [];
+    let setBins = new Set(), setPaises = new Set(), setBancos = new Set(), setBandeiras = new Set(), setClasses = new Set();
+    let regrasCount = 0;
+
     async function sha256(message) {
         const msgBuffer = new TextEncoder().encode(message); const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer); return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
     }
@@ -103,8 +90,25 @@
             else { isSetupMode = true; document.getElementById('auth-title').innerText = "Criar Senha"; document.getElementById('auth-btn').innerText = "Criar"; }
             
             carregarBotoesAdmin();
+            iniciarCacheDB();
         } catch (e) { document.getElementById('db-status').innerText = 'ERRO DE CONEXÃO'; }
     };
+
+    function iniciarCacheDB() {
+        db.collection('store_db').where('status', '==', 'available').onSnapshot(snap => {
+            storeCacheAdmin = snap.docs.map(doc => doc.data());
+            setBins.clear(); setPaises.clear(); setBancos.clear(); setBandeiras.clear(); setClasses.clear();
+            
+            storeCacheAdmin.forEach(item => {
+                const bin = String(item.bin || item.numero || '').substring(0, 6);
+                if(bin) setBins.add(bin);
+                if(item.pais && item.pais !== 'DESCONHECIDO') setPaises.add(item.pais);
+                if(item.banco && item.banco !== 'DESCONHECIDO') setBancos.add(item.banco);
+                if(item.bandeira) setBandeiras.add(item.bandeira);
+                if(item.classe) setClasses.add(item.classe);
+            });
+        });
+    }
 
     async function handleAuth() {
         const pass = document.getElementById('admin-pass').value; if (!pass) return alert('Digite a senha.'); const hash = await sha256(pass);
@@ -114,25 +118,122 @@
 
     function liberarPainel() { document.getElementById('auth-check').classList.add('hidden'); document.getElementById('admin-panel').classList.remove('hidden'); }
 
-    /* --- GESTÃO PRO DE BOTÕES --- */
-    function criarBotaoSeguro() {
+    /* --- CONSTRUTOR VISUAL DE REGRAS --- */
+    function getOptionsHtml(setObj, defaultLabel) {
+        let html = `<option value="QUALQUER">${defaultLabel}</option>`;
+        const sorted = Array.from(setObj).sort();
+        sorted.forEach(val => { html += `<option value="${val}">${val}</option>`; });
+        return html;
+    }
+
+    function adicionarRegra() {
+        regrasCount++;
+        const id = regrasCount;
+        const container = document.getElementById('regras-container');
+        
+        const div = document.createElement('div');
+        div.id = `regra-box-${id}`;
+        div.className = 'regra-box';
+        
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
+                <strong style="color:var(--primary-neon); font-size:12px;">Parte ${id} do Combo</strong>
+                <button onclick="document.getElementById('regra-box-${id}').remove()" style="width:auto; padding:2px 8px; color:red; border:1px solid red; font-size:10px;">X</button>
+            </div>
+            <div class="flex-row">
+                <input type="number" id="regra-qtd-${id}" placeholder="QTD Cartões" style="flex: 0.4;">
+                <select id="regra-tipo-${id}" style="flex: 0.6;" onchange="mudarTipoRegra(${id})">
+                    <option value="FILTRO">Pesquisar por Filtros</option>
+                    <option value="BIN">Escolher BIN Específica</option>
+                </select>
+            </div>
+            
+            <!-- Opções se for FILTRO -->
+            <div id="filtro-opcoes-${id}">
+                <div class="flex-row">
+                    <select id="regra-bandeira-${id}" style="flex:0.5;">${getOptionsHtml(setBandeiras, 'QUALQUER BANDEIRA')}</select>
+                    <select id="regra-pais-${id}" style="flex:0.5;">${getOptionsHtml(setPaises, 'QUALQUER PAÍS')}</select>
+                </div>
+                <div class="flex-row">
+                    <select id="regra-classe-${id}" style="flex:0.5;">${getOptionsHtml(setClasses, 'QUALQUER CLASSE')}</select>
+                    <select id="regra-banco-${id}" style="flex:0.5;">${getOptionsHtml(setBancos, 'QUALQUER BANCO')}</select>
+                </div>
+                <select id="regra-cc-tipo-${id}">
+                    <option value="QUALQUER">QUALQUER TIPO (CRÉDITO/DÉBITO)</option>
+                    <option value="CREDIT">CRÉDITO</option>
+                    <option value="DEBIT">DÉBITO</option>
+                </select>
+            </div>
+
+            <!-- Opções se for BIN -->
+            <div id="bin-opcoes-${id}" class="hidden">
+                <select id="regra-bin-${id}">
+                    ${getOptionsHtml(setBins, 'SELECIONE UMA BIN EM ESTOQUE...')}
+                </select>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+
+    function mudarTipoRegra(id) {
+        const tipo = document.getElementById(`regra-tipo-${id}`).value;
+        if(tipo === 'BIN') {
+            document.getElementById(`filtro-opcoes-${id}`).classList.add('hidden');
+            document.getElementById(`bin-opcoes-${id}`).classList.remove('hidden');
+        } else {
+            document.getElementById(`filtro-opcoes-${id}`).classList.remove('hidden');
+            document.getElementById(`bin-opcoes-${id}`).classList.add('hidden');
+        }
+    }
+
+    function salvarBotao() {
         const titulo = document.getElementById('btn-titulo').value.trim();
         const preco = parseFloat(document.getElementById('btn-preco').value);
-        const qtd = parseInt(document.getElementById('btn-qtd').value);
-        const tipoFiltro = document.getElementById('btn-tipo-filtro').value;
-        const valorFiltro = document.getElementById('btn-valor-filtro').value.trim().toUpperCase();
+        if(!titulo || isNaN(preco) || preco <= 0) return alert("Preencha Título e Preço Total!");
 
-        if(!titulo || isNaN(preco) || preco <= 0 || isNaN(qtd) || qtd <= 0) return alert("Preencha Título, Preço e Quantidade de cartões válidos!");
-        if(tipoFiltro !== 'MIX' && !valorFiltro) return alert("Se não for MIX, você precisa digitar o valor do filtro (Ex: 123456, BR, VISA).");
+        const container = document.getElementById('regras-container');
+        const boxes = container.querySelectorAll('.regra-box');
+        if(boxes.length === 0) return alert("Você precisa adicionar pelo menos uma regra/cartão ao pacote.");
 
+        const regrasArray = [];
+        
+        boxes.forEach(box => {
+            const id = box.id.split('-')[2];
+            const qtd = parseInt(document.getElementById(`regra-qtd-${id}`).value);
+            const tipoBusca = document.getElementById(`regra-tipo-${id}`).value;
+
+            if(isNaN(qtd) || qtd <= 0) return alert("Quantidade inválida em uma das regras.");
+
+            const regraObj = { qtd: qtd, tipoBusca: tipoBusca };
+
+            if(tipoBusca === 'BIN') {
+                const binVal = document.getElementById(`regra-bin-${id}`).value;
+                if(binVal === 'QUALQUER') return alert("Selecione uma BIN válida.");
+                regraObj.bin = binVal;
+            } else {
+                regraObj.bandeira = document.getElementById(`regra-bandeira-${id}`).value;
+                regraObj.pais = document.getElementById(`regra-pais-${id}`).value;
+                regraObj.classe = document.getElementById(`regra-classe-${id}`).value;
+                regraObj.banco = document.getElementById(`regra-banco-${id}`).value;
+                regraObj.tipo = document.getElementById(`regra-cc-tipo-${id}`).value;
+            }
+            regrasArray.push(regraObj);
+        });
+
+        if(regrasArray.length !== boxes.length) return; // Parou por erro
+
+        // Salvar no banco
         db.collection('store_buttons').add({
-            titulo, preco, qtd, tipoFiltro, valorFiltro, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            titulo: titulo,
+            preco: preco,
+            regras: regrasArray,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         }).then(() => {
-            alert("Botão Blindado criado com sucesso!");
+            alert("Botão salvo e criptografado com sucesso!");
             document.getElementById('btn-titulo').value = '';
             document.getElementById('btn-preco').value = '';
-            document.getElementById('btn-qtd').value = '';
-            document.getElementById('btn-valor-filtro').value = '';
+            container.innerHTML = '';
+            regrasCount = 0;
         });
     }
 
@@ -144,10 +245,15 @@
             
             snap.forEach(doc => {
                 const b = doc.data();
+                let regrasResumo = "";
+                b.regras.forEach((r, idx) => {
+                    if(r.tipoBusca === 'BIN') regrasResumo += `<br>▶ ${r.qtd}x BIN ${r.bin}`;
+                    else regrasResumo += `<br>▶ ${r.qtd}x ${r.pais==='QUALQUER'?'Mix':r.pais} ${r.bandeira==='QUALQUER'?'':r.bandeira} ${r.classe==='QUALQUER'?'':r.classe}`;
+                });
+
                 list.innerHTML += `
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; font-size:11px; border-bottom: 1px solid #333; padding-bottom: 5px;">
-                        <span><strong>${b.titulo}</strong> (R$ ${b.preco.toFixed(2)}) <br>
-                        <span style="font-size:9px; color:#aaa;">ENTREGA: ${b.qtd} UNIDADE(S) | REGRA: ${b.tipoFiltro} [${b.tipoFiltro === 'MIX' ? 'ALEATÓRIO' : b.valorFiltro}]</span></span>
+                        <span><strong style="color:var(--primary-neon)">${b.titulo}</strong> (R$ ${b.preco.toFixed(2)}) <span style="font-size:9px; color:#aaa;">${regrasResumo}</span></span>
                         <button onclick="db.collection('store_buttons').doc('${doc.id}').delete()" style="width:auto; padding:4px 8px; color:red; border:1px solid red;">X</button>
                     </div>`;
             });
@@ -168,179 +274,99 @@
           const response = await fetch(`https://api.juspay.in/cardbins/${bin}`, { headers: { Accept: 'application/json' } }); 
           if (!response.ok) throw new Error('offline'); 
           const data = await response.json(); 
-          
-          return { 
-              bandeira: data.brand || inferClasseFromNumber(bin), 
-              classe: data.card_sub_type || 'CLASSIC', 
-              tipo: data.type || data.extended_card_type || 'CREDITO',
-              pais: data.country || 'DESCONHECIDO',
-              banco: data.bank || 'DESCONHECIDO'
-          }; 
+          return { bandeira: data.brand || inferClasseFromNumber(bin), classe: data.card_sub_type || 'CLASSIC', tipo: data.type || data.extended_card_type || 'CREDITO', pais: data.country || 'DESCONHECIDO', banco: data.bank || 'DESCONHECIDO' }; 
       } 
-      catch (e) { 
-          return { bandeira: inferClasseFromNumber(bin), classe: 'CLASSIC', tipo: 'CREDITO', pais: 'DESCONHECIDO', banco: 'DESCONHECIDO' }; 
-      }
+      catch (e) { return { bandeira: inferClasseFromNumber(bin), classe: 'CLASSIC', tipo: 'CREDITO', pais: 'DESCONHECIDO', banco: 'DESCONHECIDO' }; }
     }
 
     function gerarDadosPorPais(paisInfo) {
         const p = String(paisInfo || '').toUpperCase();
         const isBR = p.includes('BRAZIL') || p === 'BR' || p.includes('BRASIL');
         const isUS = p.includes('UNITEDSTATES') || p === 'US' || p.includes('USA') || p.includes('UNITED STATES');
-        
         let name, cep;
-        if(isBR) {
-            name = nomesAleatoriosBR[Math.floor(Math.random() * nomesAleatoriosBR.length)];
-            cep = (Math.floor(10000 + Math.random() * 89999)) + "-" + (Math.floor(100 + Math.random() * 899));
-        } else if (isUS) {
-            name = nomesAleatoriosUS[Math.floor(Math.random() * nomesAleatoriosUS.length)];
-            cep = (Math.floor(10000 + Math.random() * 89999)).toString();
-        } else {
-            name = nomesAleatoriosUS[Math.floor(Math.random() * nomesAleatoriosUS.length)];
-            cep = "00000";
-        }
+        if(isBR) { name = nomesAleatoriosBR[Math.floor(Math.random() * nomesAleatoriosBR.length)]; cep = (Math.floor(10000 + Math.random() * 89999)) + "-" + (Math.floor(100 + Math.random() * 899)); } 
+        else if (isUS) { name = nomesAleatoriosUS[Math.floor(Math.random() * nomesAleatoriosUS.length)]; cep = (Math.floor(10000 + Math.random() * 89999)).toString(); } 
+        else { name = nomesAleatoriosUS[Math.floor(Math.random() * nomesAleatoriosUS.length)]; cep = "00000"; }
         return { name, cep };
     }
 
     async function sweepDatabase() {
-        const statusBox = document.getElementById('generation-status');
-        statusBox.innerText = 'Vasculhando a DB... aguarde.';
-        
+        const statusBox = document.getElementById('generation-status'); statusBox.innerText = 'Vasculhando a DB... aguarde.';
         try {
             const snap = await db.collection('store_db').get();
-            const toUpdate = [];
-            const binsToFetch = new Set();
-
+            const toUpdate = []; const binsToFetch = new Set();
             snap.forEach(doc => {
                 const data = doc.data();
                 if (!data.banco || data.banco === 'DESCONHECIDO' || !data.pais || data.pais === 'DESCONHECIDO' || !data.cep || !data.name) {
                     const bin = String(data.bin || data.numero || '').substring(0, 6);
-                    toUpdate.push({ id: doc.id, bin: bin });
-                    binsToFetch.add(bin);
+                    toUpdate.push({ id: doc.id, bin: bin }); binsToFetch.add(bin);
                 }
             });
-
-            if (toUpdate.length === 0) {
-                statusBox.innerText = 'Varredura completa.';
-                return alert('DB Perfeita! Nenhum cartão precisava ser corrigido.');
-            }
-
+            if (toUpdate.length === 0) { statusBox.innerText = 'Varredura completa.'; return alert('DB Perfeita! Nenhum cartão precisava ser corrigido.'); }
             statusBox.innerText = `Consultando Juspay para ${binsToFetch.size} BINs exclusivas pendentes...`;
-            const metaMap = {};
-            for (const b of [...binsToFetch]) {
-                metaMap[b] = await inferMetaForBin(b);
-            }
-
+            const metaMap = {}; for (const b of [...binsToFetch]) { metaMap[b] = await inferMetaForBin(b); }
             statusBox.innerText = `Corrigindo ${toUpdate.length} cartões na DB...`;
-            const batch = db.batch();
-            let count = 0;
-
+            const batch = db.batch(); let count = 0;
             for (const item of toUpdate) {
-                const meta = metaMap[item.bin];
-                const infoGerada = gerarDadosPorPais(meta.pais);
-
+                const meta = metaMap[item.bin]; const infoGerada = gerarDadosPorPais(meta.pais);
                 const ref = db.collection('store_db').doc(item.id);
-                batch.update(ref, {
-                    bandeira: meta.bandeira,
-                    classe: meta.classe,
-                    tipo: meta.tipo,
-                    pais: meta.pais,
-                    banco: meta.banco,
-                    name: infoGerada.name,
-                    cep: infoGerada.cep
-                });
-                
-                count++;
-                if(count >= 490) { 
-                    await batch.commit();
-                    count = 0;
-                }
+                batch.update(ref, { bandeira: meta.bandeira, classe: meta.classe, tipo: meta.tipo, pais: meta.pais, banco: meta.banco, name: infoGerada.name, cep: infoGerada.cep });
+                count++; if(count >= 490) { await batch.commit(); count = 0; }
             }
-            
             if(count > 0) await batch.commit();
-
-            statusBox.innerText = 'Tudo sincronizado!';
-            alert(`Sincronização OK! ${toUpdate.length} cartões foram corrigidos.`);
-
-        } catch (error) {
-            console.error(error);
-            statusBox.innerText = 'Erro na sincronização.';
-            alert('Aconteceu um erro. Tente de novo.');
-        }
+            statusBox.innerText = 'Tudo sincronizado!'; alert(`Sincronização OK! ${toUpdate.length} cartões foram corrigidos.`);
+        } catch (error) { statusBox.innerText = 'Erro na sincronização.'; alert('Aconteceu um erro. Tente de novo.'); }
     }
 
     async function parseText() {
       const text = document.getElementById('raw-text').value; const lines = text.split(/\r?\n/).filter(Boolean);
       parsedItems = []; uniqueBins.clear();
       let outputHTML = '<h4 style="color:var(--text-main); margin-bottom: 8px;">Itens Extraídos:</h4><div style="margin-bottom:15px; font-size:11px; line-height: 1.4;">';
-
       for (const line of lines) {
-        const match = line.match(/(\d{13,19})[\D]+(\d{2})[\D]+(\d{2,4})[\D]+(\d{3,4})/);
-        if (!match) continue;
+        const match = line.match(/(\d{13,19})[\D]+(\d{2})[\D]+(\d{2,4})[\D]+(\d{3,4})/); if (!match) continue;
         const num = match[1]; const mes = match[2]; const anoStr = match[3]; const ano = anoStr.length === 2 ? '20' + anoStr : anoStr; const cvc = match[4]; const bin = num.substring(0, 6);
-        uniqueBins.add(bin);
-        parsedItems.push({ numero: num, exp: `${mes}/${ano}`, cvc, bin, bin_prefix: bin, status: 'available', owner: null });
+        uniqueBins.add(bin); parsedItems.push({ numero: num, exp: `${mes}/${ano}`, cvc, bin, bin_prefix: bin, status: 'available', owner: null });
         outputHTML += `<strong>${num}</strong> | ${mes} | ${ano} | ${cvc}<br>`;
       }
-
       if (parsedItems.length > 1000) outputHTML += `<div style="margin-top:8px; color:#ff9b9b">Processando até ${parsedItems.length} itens.</div>`;
       outputHTML += '</div>';
 
       if (parsedItems.length > 0) {
           document.getElementById('parsed-results').innerHTML = '<span style="color:#00ff55;">Consultando API Juspay para as BINS... aguarde.</span>';
-          
           const binList = [...uniqueBins]; const metaMap = {};
           for (const bin of binList) { const meta = await inferMetaForBin(bin); metaMap[bin] = meta; }
-          
           parsedItems.forEach(item => { 
               const meta = metaMap[item.bin] || {}; 
-              item.bandeira = meta.bandeira; 
-              item.classe = meta.classe; 
-              item.tipo = meta.tipo;
-              item.pais = meta.pais;
-              item.banco = meta.banco;
-              
-              const infoGerada = gerarDadosPorPais(item.pais);
-              item.name = infoGerada.name;
-              item.cep = infoGerada.cep;
+              item.bandeira = meta.bandeira; item.classe = meta.classe; item.tipo = meta.tipo; item.pais = meta.pais; item.banco = meta.banco;
+              const infoGerada = gerarDadosPorPais(item.pais); item.name = infoGerada.name; item.cep = infoGerada.cep;
           });
-
-          outputHTML += '<h4 style="color: var(--secondary-neon); margin-bottom: 10px; font-size: 14px;">Defina os Preços:</h4>';
+          outputHTML += '<h4 style="color: var(--secondary-neon); margin-bottom: 10px; font-size: 14px;">Defina os Preços Ocultos:</h4>';
           [...uniqueBins].forEach(bin => { 
               outputHTML += `<div style="margin-bottom: 12px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;"> 
               BIN <strong>${bin}</strong> (${metaMap[bin].bandeira} - ${metaMap[bin].banco}): 
-              <input type="number" id="price-${bin}" placeholder="R$ (Ex: 35.00)" style="width: 100%; padding: 12px; margin-top: 8px; font-size: 14px; box-sizing: border-box;"> 
+              <input type="number" id="price-${bin}" placeholder="R$ (Opcional, só se for vender pela Busca Live)" style="width: 100%; padding: 12px; margin-top: 8px; font-size: 14px;"> 
               </div>`; 
           });
-          
           document.getElementById('parsed-results').innerHTML = outputHTML;
-      } else {
-          document.getElementById('parsed-results').innerHTML = 'Nenhum padrão encontrado. Verifique o texto.';
-      }
+      } else { document.getElementById('parsed-results').innerHTML = 'Nenhum padrão encontrado. Verifique o texto.'; }
     }
 
     async function uploadToDB() {
       if (parsedItems.length === 0) return alert('Nada para subir.');
-      let binPrices = {}; let allPricesValid = true;
-      
+      let binPrices = {}; 
       [...uniqueBins].forEach(bin => {
           let priceVal = parseFloat(document.getElementById(`price-${bin}`).value);
-          if (isNaN(priceVal) || priceVal <= 0) { allPricesValid = false; }
+          if (isNaN(priceVal) || priceVal <= 0) { priceVal = 0; } // Permite preço 0 para quem vende só por pacote/botão
           binPrices[bin] = priceVal;
       });
-
-      if (!allPricesValid) return alert('ATENÇÃO: Preencha um valor válido (maior que zero) para TODAS as BINs.');
-
       const total = parsedItems.length; const batchSize = 500; let written = 0;
-
       for (let offset = 0; offset < total; offset += batchSize) {
         const batch = db.batch(); const slice = parsedItems.slice(offset, offset + batchSize);
         slice.forEach(item => { const docRef = db.collection('store_db').doc(); item.price = binPrices[item.bin]; batch.set(docRef, item); });
         await batch.commit(); written += slice.length;
       }
-
       alert(`${written} itens adicionados com sucesso!`);
-      parsedItems = []; uniqueBins.clear(); document.getElementById('parsed-results').innerHTML = '';
-      document.getElementById('raw-text').value = '';
+      parsedItems = []; uniqueBins.clear(); document.getElementById('parsed-results').innerHTML = ''; document.getElementById('raw-text').value = '';
     }
 
     function generateCode() {
