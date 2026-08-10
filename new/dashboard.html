@@ -58,7 +58,6 @@
             </div>
 
             <div id="section-store" class="section-pane">
-                <!-- Botões dinâmicos anti-fraude do Admin -->
                 <div id="dynamic-buttons-container" style="display:flex; flex-direction:column; gap:8px; margin-bottom: 20px;"></div>
 
                 <hr style="border: 1px dashed rgba(255,255,255,0.12); margin: 20px 0;">
@@ -110,20 +109,14 @@
         let storeCache = [];
 
         auth.onAuthStateChanged(user => { 
-            if (user) { 
-                currentUser = user; 
-                loadProfile(); 
-                loadHistory(); 
-                loadStoreCache(); 
-                loadDynamicButtons(); 
-            } 
+            if (user) { currentUser = user; loadProfile(); loadHistory(); loadStoreCache(); loadDynamicButtons(); } 
             else { window.location.href = "index.html"; } 
         });
 
+        /* --- PERFIL --- */
         function loadProfile() {
             db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
-                const data = doc.data();
-                currentSaldo = data.saldo || 0;
+                const data = doc.data(); currentSaldo = data.saldo || 0;
                 document.getElementById('saldo-display').innerText = currentSaldo.toFixed(2);
                 if (data.avatarUrl) { document.getElementById('profile-img').src = data.avatarUrl; }
             });
@@ -131,69 +124,73 @@
         function abrirModalPerfil() { document.getElementById('profileModal').classList.add('active'); }
         function fecharModalPerfil() { document.getElementById('profileModal').classList.remove('active'); document.getElementById('nova-foto-url').value = ''; }
         function salvarNovaFoto() {
-            const url = document.getElementById('nova-foto-url').value.trim();
-            if(!url) return;
+            const url = document.getElementById('nova-foto-url').value.trim(); if(!url) return;
             db.collection('users').doc(currentUser.uid).update({avatarUrl: url}).then(()=>{ fecharModalPerfil(); alert('Foto atualizada!'); });
         }
         
         function loadStoreCache() {
             db.collection('store_db').where('status', '==', 'available').onSnapshot(snap => {
-                storeCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                buscarBinLive(); 
+                storeCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })); buscarBinLive(); 
             });
         }
 
-        /* --- BOTÕES DINÂMICOS ANTI-FRAUDE --- */
+        /* --- BOTÕES INTELIGENTES ANTI-FRAUDE --- */
         function loadDynamicButtons() {
             db.collection('store_buttons').orderBy('createdAt').onSnapshot(snap => {
                 const container = document.getElementById('dynamic-buttons-container');
                 container.innerHTML = '';
                 snap.forEach(doc => {
                     const b = doc.data();
-                    // Agora o HTML só envia o ID criptografado (doc.id), nada de preços no HTML.
-                    container.innerHTML += `
-                        <button class="button-primary" style="margin: 0;" onclick="executarCompraSegura('${doc.id}')">
-                            ${b.titulo} (R$ ${b.preco.toFixed(2)})
-                        </button>
-                    `;
+                    container.innerHTML += `<button class="button-primary" style="margin: 0;" onclick="executarCompraSegura('${doc.id}')">${b.titulo} (R$ ${b.preco.toFixed(2)})</button>`;
                 });
             });
         }
 
-        // FUNÇÃO BLINDADA: Lê do servidor na hora H
+        // LÓGICA DE COMPRA MULTI-REGRAS
         async function executarCompraSegura(btnId) {
-            // Puxa as regras reais e o preço direto do DB (Impede fraude pelo F12)
             const btnDoc = await db.collection('store_buttons').doc(btnId).get();
             if(!btnDoc.exists) return alert("Erro: Botão não encontrado ou desativado.");
             const btnData = btnDoc.data();
             
             if(currentSaldo < btnData.preco) return alert('Saldo insuficiente. Recarregue sua carteira.');
             
-            let matches = storeCache;
-            const v = String(btnData.valorFiltro).toUpperCase();
-            
-            if(btnData.tipoFiltro === 'BIN') matches = matches.filter(c => String(c.bin || c.numero).startsWith(v));
-            if(btnData.tipoFiltro === 'PAIS') matches = matches.filter(c => String(c.pais).toUpperCase().includes(v));
-            if(btnData.tipoFiltro === 'CLASSE') matches = matches.filter(c => String(c.classe).toUpperCase().includes(v));
-            if(btnData.tipoFiltro === 'BANDEIRA') matches = matches.filter(c => String(c.bandeira).toUpperCase().includes(v));
-            
-            if(matches.length < btnData.qtd) {
-                return alert(`ESTOQUE INSUFICIENTE!\nO pacote pede ${btnData.qtd}x [${btnData.tipoFiltro === 'MIX' ? 'Aleatórios' : v}]\nDisponíveis no estoque: ${matches.length}`);
-            }
-            
-            if(!confirm(`Confirmar compra: "${btnData.titulo}" por R$ ${btnData.preco.toFixed(2)}?\nVocê receberá ${btnData.qtd} cartão(ões).`)) return;
-            
+            let tempCache = [...storeCache];
             let cardsToBuy = [];
-            let tempCache = [...matches];
-            
-            for(let i=0; i<btnData.qtd; i++) {
-                const rIdx = Math.floor(Math.random() * tempCache.length);
-                cardsToBuy.push(tempCache[rIdx]);
-                tempCache.splice(rIdx, 1);
-            }
 
+            // Processar regra por regra do pacote
+            for(let r of btnData.regras) {
+                let matches = tempCache.filter(c => {
+                    if(r.tipoBusca === 'BIN') {
+                        return String(c.bin || c.numero).startsWith(r.bin);
+                    } else {
+                        const mBand = r.bandeira === 'QUALQUER' || String(c.bandeira).toUpperCase() === String(r.bandeira).toUpperCase();
+                        const mPais = r.pais === 'QUALQUER' || String(c.pais).toUpperCase() === String(r.pais).toUpperCase();
+                        const mClas = r.classe === 'QUALQUER' || String(c.classe).toUpperCase() === String(r.classe).toUpperCase();
+                        const mBanc = r.banco === 'QUALQUER' || String(c.banco).toUpperCase() === String(r.banco).toUpperCase();
+                        const mTipo = r.tipo === 'QUALQUER' || String(c.tipo).toUpperCase() === String(r.tipo).toUpperCase();
+                        return mBand && mPais && mClas && mBanc && mTipo;
+                    }
+                });
+
+                if(matches.length < r.qtd) {
+                    let desc = r.tipoBusca === 'BIN' ? `BIN ${r.bin}` : `${r.pais!=='QUALQUER'?r.pais:''} ${r.bandeira!=='QUALQUER'?r.bandeira:''}`.trim() || 'Aleatórios';
+                    return alert(`ESTOQUE INSUFICIENTE!\nO pacote requer ${r.qtd}x [${desc}].\nTemos apenas ${matches.length} disponíveis.`);
+                }
+
+                // Sorteio e Remoção do cache temporário
+                for(let i=0; i<r.qtd; i++) {
+                    const rIdx = Math.floor(Math.random() * matches.length);
+                    const selected = matches[rIdx];
+                    cardsToBuy.push(selected);
+                    tempCache = tempCache.filter(c => c.id !== selected.id); // Tira para não vender duplicado
+                    matches.splice(rIdx, 1);
+                }
+            }
+            
+            if(!confirm(`Confirmar compra: "${btnData.titulo}" por R$ ${btnData.preco.toFixed(2)}?\nVocê receberá ${cardsToBuy.length} cartão(ões).`)) return;
+            
             const batch = db.batch();
-            const precoUnitario = btnData.preco / btnData.qtd; // Registra o preço fatiado
+            const precoUnitario = btnData.preco / cardsToBuy.length;
 
             cardsToBuy.forEach(item => {
                 const userCard = Object.assign({}, item, { boughtAt: firebase.firestore.FieldValue.serverTimestamp(), price: precoUnitario });
@@ -207,10 +204,8 @@
             batch.update(userBalRef, { saldo: firebase.firestore.FieldValue.increment(-btnData.preco) });
 
             batch.commit().then(() => {
-                currentHistoryIdx = 0;
-                alert('Compra concluída! Verifique seu histórico.');
-                selectTab('history');
-            }).catch(e => alert('Erro crítico ao processar compra.'));
+                currentHistoryIdx = 0; alert('Compra concluída! Verifique seu histórico.'); selectTab('history');
+            }).catch(e => alert('Erro crítico ao processar compra. Tente novamente.'));
         }
 
         function selectTab(tab) {
@@ -235,10 +230,7 @@
             const input = document.getElementById('bin-search').value.trim();
             const container = document.getElementById('live-search-results');
 
-            if (!input) {
-                container.innerHTML = '<div style="text-align:center; font-size:11px; color:var(--text-main); margin-top:10px;">Comece a digitar para ver os cartões disponíveis no estoque.</div>';
-                return;
-            }
+            if (!input) { container.innerHTML = '<div style="text-align:center; font-size:11px; color:var(--text-main); margin-top:10px;">Comece a digitar para ver os cartões disponíveis no estoque.</div>'; return; }
 
             const matches = storeCache.filter(item => {
                 if (/^\d+$/.test(input)) {
@@ -247,42 +239,33 @@
                 } else {
                     const str = input.toUpperCase();
                     return (
-                        String(item.pais || '').toUpperCase().includes(str) ||
-                        String(item.banco || '').toUpperCase().includes(str) ||
-                        String(item.classe || '').toUpperCase().includes(str) ||
-                        String(item.bandeira || '').toUpperCase().includes(str) ||
-                        String(item.tipo || '').toUpperCase().includes(str)
+                        String(item.pais || '').toUpperCase().includes(str) || String(item.banco || '').toUpperCase().includes(str) ||
+                        String(item.classe || '').toUpperCase().includes(str) || String(item.bandeira || '').toUpperCase().includes(str) || String(item.tipo || '').toUpperCase().includes(str)
                     );
                 }
             });
 
-            if (matches.length === 0) {
-                container.innerHTML = '<div style="text-align:center; font-size:12px; color:var(--secondary-neon); margin-top:20px;">Nenhum cartão encontrado com esse filtro.</div>';
-                return;
-            }
+            if (matches.length === 0) { container.innerHTML = '<div style="text-align:center; font-size:12px; color:var(--secondary-neon); margin-top:20px;">Nenhum cartão encontrado.</div>'; return; }
 
             const binsMap = {};
             matches.forEach(m => {
-                const b = String(m.bin || m.numero || '').substring(0,6);
-                if (!binsMap[b]) binsMap[b] = { count: 0, prices: new Set(), data: m };
-                binsMap[b].count++;
-                binsMap[b].prices.add(m.price || 0);
+                if(m.price && m.price > 0) {
+                    const b = String(m.bin || m.numero || '').substring(0,6);
+                    if (!binsMap[b]) binsMap[b] = { count: 0, prices: new Set(), data: m };
+                    binsMap[b].count++; binsMap[b].prices.add(m.price);
+                }
             });
 
             container.innerHTML = '';
             
             Object.keys(binsMap).slice(0, 20).forEach(b => {
-                const info = binsMap[b];
-                const d = info.data;
-                const sortedPrices = Array.from(info.prices).sort((a,b) => a - b);
+                const info = binsMap[b]; const d = info.data; const sortedPrices = Array.from(info.prices).sort((a,b) => a - b);
                 
                 let buttonsHtml = sortedPrices.map(p => `
-                    <button class="button-primary" style="padding: 8px 10px; font-size: 11px; width: auto; flex: 1; margin: 0;" onclick="comprarManualBin('${b}', ${p})">
-                        COMPRAR R$ ${p.toFixed(2)}
-                    </button>
+                    <button class="button-primary" style="padding: 8px 10px; font-size: 11px; width: auto; flex: 1; margin: 0;" onclick="comprarManualBin('${b}', ${p})">COMPRAR R$ ${p.toFixed(2)}</button>
                 `).join('');
 
-                const cardHtml = `
+                container.innerHTML += `
                 <div class="live-search-card">
                     <div class="title">BIN ${b} <span style="font-size:10px; color:#fff; float:right;">Estoque: ${info.count}</span></div>
                     <div class="info">
@@ -290,87 +273,55 @@
                         BANCO: <span style="color:#fff;">${safeText(d.banco, 'DESCONHECIDO').toUpperCase()}</span><br>
                         PAÍS: <span style="color:var(--primary-neon);">${safeText(d.pais, 'DESCONHECIDO').toUpperCase()}</span>
                     </div>
-                    <div class="prices">
-                        ${buttonsHtml}
-                    </div>
+                    <div class="prices">${buttonsHtml}</div>
                 </div>`;
-                
-                container.innerHTML += cardHtml;
             });
         }
 
         function comprarManualBin(binPrefix, priceStr) {
             const price = parseFloat(priceStr);
             if (currentSaldo < price) return alert("Saldo Insuficiente! Requer R$ " + price.toFixed(2));
-            
             if (!confirm(`Deseja confirmar a compra deste cartão por R$ ${price.toFixed(2)}?`)) return;
             
-            const match = storeCache.find(item => {
-                const itemBin = String(item.bin || item.numero || '').substring(0,6);
-                return itemBin === binPrefix && item.price === price;
-            });
-
-            if (!match) return alert("Este cartão acabou de ser vendido. Atualizando o painel...");
+            const match = storeCache.find(item => { const itemBin = String(item.bin || item.numero || '').substring(0,6); return itemBin === binPrefix && item.price === price; });
+            if (!match) return alert("Este cartão acabou de ser vendido. Atualizando...");
 
             const userCard = Object.assign({}, match, { boughtAt: firebase.firestore.FieldValue.serverTimestamp() });
             
             db.collection('users').doc(currentUser.uid).collection('cards').add(userCard)
             .then(() => db.collection('store_db').doc(match.id).delete())
             .then(() => db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(-price) }))
-            .then(() => {
-                currentHistoryIdx = 0;
-                alert('Compra Concluída com Sucesso!'); 
-                selectTab('history');
-            }).catch(err => { alert('Erro na compra. Tente novamente.'); });
+            .then(() => { currentHistoryIdx = 0; alert('Compra Concluída com Sucesso!'); selectTab('history'); }).catch(err => { alert('Erro na compra.'); });
         }
 
         /* --- HISTÓRICO --- */
         function loadHistory() {
             db.collection('users').doc(currentUser.uid).collection('cards').orderBy('boughtAt', 'desc').onSnapshot(snap => {
-                historyData = [];
-                snap.forEach(doc => { const d = doc.data(); d._id = doc.id; if (!d.name || d.name.trim() === '') { d.name = "NOME DESCONHECIDO"; } historyData.push(d); });
+                historyData = []; snap.forEach(doc => { const d = doc.data(); d._id = doc.id; if (!d.name || d.name.trim() === '') { d.name = "NOME DESCONHECIDO"; } historyData.push(d); });
                 renderHistoryList(); renderPreviewCard();
             });
         }
 
         function renderPreviewCard() {
-            const preview = document.getElementById('card-preview'); 
-            const count = document.getElementById('history-count');
-            const prevBtn = document.getElementById('nav-prev'); 
-            const nextBtn = document.getElementById('nav-next');
-            
+            const preview = document.getElementById('card-preview'); const count = document.getElementById('history-count');
+            const prevBtn = document.getElementById('nav-prev'); const nextBtn = document.getElementById('nav-next');
             if (!preview) return;
-            if (historyData.length === 0) { 
-                preview.innerHTML = '<div class="cc-empty">Nenhum cartão comprado.</div>'; 
-                count.innerText = '0 / 0'; 
-                prevBtn.disabled = true; 
-                nextBtn.disabled = true; 
-                return; 
-            }
+            if (historyData.length === 0) { preview.innerHTML = '<div class="cc-empty">Nenhum cartão comprado.</div>'; count.innerText = '0 / 0'; prevBtn.disabled = true; nextBtn.disabled = true; return; }
             
             const data = historyData[currentHistoryIdx];
             preview.innerHTML = `
                 <button class="info-btn" onclick="event.stopPropagation(); mostrarInfo()"><i class="ph-bold ph-info"></i></button>
-                <div class="cc-top">
-                    <div class="cc-chip"></div>
-                    <div class="cc-brand">${safeText(data.bandeira || data.classe, 'CARD').toUpperCase()}</div>
-                </div>
+                <div class="cc-top"><div class="cc-chip"></div><div class="cc-brand">${safeText(data.bandeira || data.classe, 'CARD').toUpperCase()}</div></div>
                 <div class="cc-number">${formatCardNumber(data.numero)}</div>
                 <div class="cc-name">${safeText(data.name, 'SEM NOME').toUpperCase()}</div>
-                <div class="cc-footer">
-                    <div><span>VALID</span><strong>${safeText(data.exp, '**/**')}</strong></div>
-                    <div><span>CVV</span><strong>${safeText(data.cvc, '***')}</strong></div>
-                </div>
+                <div class="cc-footer"><div><span>VALID</span><strong>${safeText(data.exp, '**/**')}</strong></div><div><span>CVV</span><strong>${safeText(data.cvc, '***')}</strong></div></div>
             `;
             count.innerText = `${currentHistoryIdx + 1} / ${historyData.length}`;
-            
-            prevBtn.disabled = (historyData.length <= 1 || currentHistoryIdx === 0);
-            nextBtn.disabled = (historyData.length <= 1 || currentHistoryIdx === historyData.length - 1);
+            prevBtn.disabled = (historyData.length <= 1 || currentHistoryIdx === 0); nextBtn.disabled = (historyData.length <= 1 || currentHistoryIdx === historyData.length - 1);
         }
 
         function mostrarInfo() {
-            if(!historyData.length) return;
-            const data = historyData[currentHistoryIdx];
+            if(!historyData.length) return; const data = historyData[currentHistoryIdx];
             const content = document.getElementById('info-content');
             content.innerHTML = `
                 <div class="info-row"><strong>NOME:</strong> ${safeText(data.name, 'DESCONHECIDO')}</div>
@@ -392,45 +343,29 @@
                 card.className = `history-card${idx === currentHistoryIdx ? ' active' : ''}`;
                 card.style.cursor = 'pointer';
                 card.innerHTML = `
-                    <div class="card-top" style="margin-bottom: 4px;">
-                        <div class="card-num" style="font-size: 10px;">${formatCardNumber(d.numero)}</div>
-                        <button onclick="event.stopPropagation(); apagarCompra('${d._id}')" class="button-danger" style="padding: 2px 6px; font-size: 10px; border-radius: 4px; margin: 0;">X</button>
-                    </div>
-                    <div class="card-body" style="font-size: 9px; margin-top:0;">
-                        <span style="color: #fff;">${safeText(d.classe, 'CARD').toUpperCase()}</span><br>
-                        VAL: ${safeText(d.exp, '**/**')}
-                    </div>
+                    <div class="card-top" style="margin-bottom: 4px;"><div class="card-num" style="font-size: 10px;">${formatCardNumber(d.numero)}</div><button onclick="event.stopPropagation(); apagarCompra('${d._id}')" class="button-danger" style="padding: 2px 6px; font-size: 10px; border-radius: 4px; margin: 0;">X</button></div>
+                    <div class="card-body" style="font-size: 9px; margin-top:0;"><span style="color: #fff;">${safeText(d.classe, 'CARD').toUpperCase()}</span><br>VAL: ${safeText(d.exp, '**/**')}</div>
                 `;
-                card.onclick = () => { currentHistoryIdx = idx; renderHistoryList(); renderPreviewCard(); };
-                list.appendChild(card);
+                card.onclick = () => { currentHistoryIdx = idx; renderHistoryList(); renderPreviewCard(); }; list.appendChild(card);
             });
         }
 
         function apagarCompra(docId) { if(!confirm('Remover este item?')) return; db.collection('users').doc(currentUser.uid).collection('cards').doc(docId).delete().then(() => { currentHistoryIdx = 0; }); }
         function limparHistorico() { if(!confirm('Apagar todo o histórico?')) return; const batch = db.batch(); historyData.forEach(item => { const ref = db.collection('users').doc(currentUser.uid).collection('cards').doc(item._id); batch.delete(ref); }); batch.commit().then(() => { currentHistoryIdx = 0; }); }
-        
         function copiarCartaoAtual() {
             if (!historyData.length) return; const data = historyData[currentHistoryIdx];
             const text = `Nome: ${data.name || ''}\nNúmero: ${data.numero || ''}\nExp: ${data.exp || ''}\nCVC: ${data.cvc || ''}\nCEP: ${data.cep || ''}\nPaís: ${data.pais || ''}`;
             navigator.clipboard.writeText(text).then(() => { const preview = document.getElementById('card-preview'); preview.classList.add('copied'); setTimeout(() => preview.classList.remove('copied'), 900); });
         }
-
         function resgatarCodigo() {
             const code = document.getElementById('resgate-codigo').value.trim(); if(!code) return alert('Digite um código.');
-            db.collection('codes').doc(code).get().then(snap => {
-                if(!snap.exists) return alert('Código inválido.');
-                db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(snap.data().value || 0) }).then(()=> { alert('Resgatado!'); document.getElementById('resgate-codigo').value = ''; });
-            });
+            db.collection('codes').doc(code).get().then(snap => { if(!snap.exists) return alert('Código inválido.'); db.collection('users').doc(currentUser.uid).update({ saldo: firebase.firestore.FieldValue.increment(snap.data().value || 0) }).then(()=> { alert('Resgatado!'); document.getElementById('resgate-codigo').value = ''; }); });
         }
-
         function navHistory(dir) {
             if (!historyData.length) return;
-            if (dir > 0) { currentHistoryIdx = Math.min(historyData.length - 1, currentHistoryIdx + 1); } 
-            else { currentHistoryIdx = Math.max(0, currentHistoryIdx - 1); }
-            renderHistoryList(); 
-            renderPreviewCard();
+            if (dir > 0) { currentHistoryIdx = Math.min(historyData.length - 1, currentHistoryIdx + 1); } else { currentHistoryIdx = Math.max(0, currentHistoryIdx - 1); }
+            renderHistoryList(); renderPreviewCard();
         }
-
         function logout() { auth.signOut(); }
     </script>
 </body>
